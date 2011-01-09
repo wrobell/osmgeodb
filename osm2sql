@@ -21,8 +21,8 @@ FIND_NODE_ID = et.XPath('nd/@ref')
 print("""
 begin;
 
-drop index if exists idx_osm_point_h;
-drop index if exists idx_osm_line_h;
+drop index if exists idx_osm_point_t;
+drop index if exists idx_osm_line_t;
 drop table if exists osm_point;
 drop table if exists _osm_line;
 
@@ -31,7 +31,7 @@ create table osm_point (
     tags hstore, location geography(point, 4326),
     primary key (id)
 );
-create index idx_osm_point_h on osm_point using gin (tags);
+create index idx_osm_point_t on osm_point using gin (tags);
 
 create table _osm_line (
     id bigint,
@@ -39,7 +39,7 @@ create table _osm_line (
     points bigint[],
     primary key (id)
 );
-create index idx_osm_line_h on _osm_line using gin (tags);
+create index idx_osm_line_t on _osm_line using gin (tags);
 
 """)
 
@@ -81,3 +81,4 @@ for _, n in f:
 print('\.')
 print('commit;')
 
+# vim: sw=4:et:ai
