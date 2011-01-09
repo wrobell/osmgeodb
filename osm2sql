@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import lxml.etree as et
 import bz2
-from struct import pack
-import shelve
 import itertools
+import lxml.etree as et
+import os.path
+import shelve
 import sys
+from struct import pack
 
 quote = lambda s: s.replace('"', '').replace('\'', '').replace('\\', '')
 get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(k, quote(v))
@@ -42,8 +43,12 @@ create index idx_osm_line_h on _osm_line using gin (tags);
 
 """)
 
+fin = sys.argv[1]
+if os.path.splitext(fin)[1] == '.bz2':
+    fin = bz2.BZ2File(fin)
+
 last = ''
-f = et.iterparse(sys.argv[1])
+f = et.iterparse(fin)
 print("copy osm_point (id, location, tags) from stdin with null as \'\';")
 for _, n in f:
     if n.tag == 'node':
