@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import lxml.etree as et
+import bz2
+from struct import pack
+import shelve
+import itertools
+import sys
+
+quote = lambda s: s.replace('"', '').replace('\'', '').replace('\\', '')
+get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(k, quote(v))
+            for k, v in zip(FIND_TAG_K(n), FIND_TAG_V(n)))
+
+FMT_POINT = 'POINT({} {})'.format
+
+FIND_TAG_K = et.XPath('tag/@k')
+FIND_TAG_V = et.XPath('tag/@v')
+FIND_NODE_ID = et.XPath('nd/@ref')
+
+print("""
+begin;
+
+drop index if exists idx_osm_point_h;
+drop index if exists idx_osm_line_h;
+drop table if exists osm_point;
+drop table if exists _osm_line;
+
+create table osm_point (
+    id bigint,
+    tags hstore, location geography(point, 4326),
+    primary key (id)
+);
+create index idx_osm_point_h on osm_point using gin (tags);
+
+create table _osm_line (
+    id bigint,
+    tags hstore,
+    points bigint[],
+    primary key (id)
+);
+create index idx_osm_line_h on _osm_line using gin (tags);
+
+""")
+
+last = ''
+f = et.iterparse(sys.argv[1])
+print("copy osm_point (id, location, tags) from stdin with null as \'\';")
+for _, n in f:
+    if n.tag == 'node':
+        id = n.get('id')
+        pt = FMT_POINT(n.get('lon'), n.get('lat'))
+        tags = get_tags(n)
+        print('\t'.join((id, pt, tags)))
+
+    elif n.tag == 'way':
+        if last != 'way':
+            print('\.\n')
+            print('copy _osm_line (id, tags, points) from stdin with null as \'\';')
+        id = n.get('id')
+        tags = get_tags(n)
+        points = '{' + ','.join(FIND_NODE_ID(n)) + '}'
+        print('\t'.join((id, tags, points)))
+    elif n.tag == 'relation':
+        pass
+
+    # clear memory
+    last = n.tag
+    n.clear()
+
+    parent = n.getparent()
+    ps = n.getprevious()
+    while ps is not None:
+        parent.remove(ps)
+        ps = n.getprevious()
+
+print('\.')
+print('commit;')
+
