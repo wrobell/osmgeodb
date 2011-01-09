@@ -20,13 +20,10 @@
 #
 
 
-import bz2
-import itertools
 import lxml.etree as et
+import bz2
 import os.path
-import shelve
 import sys
-from struct import pack
 
 quote = lambda s: s.replace('"', '').replace('\'', '').replace('\\', '')
 get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(k, quote(v))

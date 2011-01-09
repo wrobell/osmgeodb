@@ -1,7 +1,8 @@
 The osm2sql script
 ==================
 The osm2sql script converts OpenStreetMap data (OSM files) into SQL spatial
-data.
+data. Both, uncompressed and compressed with bzip2 OpenStreetMap files are
+supported.
 
 The script supports 2nd step of the following workflow
 
