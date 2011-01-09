@@ -15,6 +15,8 @@ used while uploading large OpenStreetMap files.
 
 At the moment it was tested only with PostgreSQL 9.0.2 and Postgis 1.5.2.
 
+The script is distributed under GPL version 3 license.
+
 Database Schema
 ===============
 
