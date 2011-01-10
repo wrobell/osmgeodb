@@ -42,7 +42,7 @@ def clear_node(n):
         ps = n.getprevious()
 
 
-FMT_POINT = 'POINT({} {})'.format
+FMT_POINT = 'SRID=4326;POINT({} {})'.format
 
 FIND_TAG_K = et.XPath('tag/@k')
 FIND_TAG_V = et.XPath('tag/@v')
@@ -54,7 +54,7 @@ begin;
 drop index if exists idx_osm_point_t;
 drop index if exists idx_osm_line_t;
 drop table if exists osm_point;
-drop table if exists _osm_line;
+drop table if exists osm_line;
 
 create table osm_point (
     id bigint,
@@ -64,20 +64,14 @@ create table osm_point (
 select AddGeometryColumn('osm_point', 'location', 4326, 'POINT', 2);
 create index idx_osm_point_t on osm_point using gin (tags);
 
-create table _osm_line (
+create table osm_line (
     id bigint,
     tags hstore,
     points bigint[],
     primary key (id)
 );
-create index idx_osm_line_t on _osm_line using gin (tags);
-
-create table osm_line (
-    id bigint,
-    tags hstore,
-    primary key (id)
-);
 select AddGeometryColumn('osm_line', 'shape', 4326, 'LINESTRING', 2);
+create index idx_osm_line_t on osm_line using gin (tags);
 
 """)
 
@@ -101,7 +95,7 @@ for _, n in f:
     elif n.tag == 'way':
         if last == 'node':
             print('\.\n')
-            print('copy _osm_line (id, tags, points) from stdin with null as \'\';')
+            print('copy osm_line (id, tags, points) from stdin with null as \'\';')
 
         id = n.get('id')
         tags = get_tags(n)

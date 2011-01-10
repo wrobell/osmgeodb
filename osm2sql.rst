@@ -55,11 +55,8 @@ Database Schema
 osm_point
     OpenStreetMap point (node) data.
 
-_osm_line
-    OpenStreetMap waypoint data. Point are referenced via point identifier.
-
 osm_line
-    OpenStreetMap line (waypoint) spatial data. Points (nodes) are not referenced.
+    OpenStreetMap waypoint data.
 
 Indices
 -------
