@@ -83,7 +83,7 @@ for _, n in f:
         points = '{' + ','.join(FIND_NODE_ID(n)) + '}'
         print('\t'.join((id, tags, points)))
     elif n.tag == 'relation':
-        pass
+        break
 
     # clear memory
     last = n.tag
