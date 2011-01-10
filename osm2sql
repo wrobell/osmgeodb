@@ -29,6 +29,19 @@ quote = lambda s: s.replace('"', '').replace('\'', '').replace('\\', '')
 get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(k, quote(v))
             for k, v in zip(FIND_TAG_K(n), FIND_TAG_V(n)))
 
+def clear_node(n):
+    """
+    Clear memory after parsing a node with ElementTree API.
+    """
+    n.clear()
+
+    parent = n.getparent()
+    ps = n.getprevious()
+    while ps is not None:
+        parent.remove(ps)
+        ps = n.getprevious()
+
+
 FMT_POINT = 'POINT({} {})'.format
 
 FIND_TAG_K = et.XPath('tag/@k')
@@ -45,7 +58,8 @@ drop table if exists _osm_line;
 
 create table osm_point (
     id bigint,
-    tags hstore, location geography(point, 4326),
+    tags hstore,
+    location geography(point, 4326),
     primary key (id)
 );
 create index idx_osm_point_t on osm_point using gin (tags);
@@ -57,6 +71,13 @@ create table _osm_line (
     primary key (id)
 );
 create index idx_osm_line_t on _osm_line using gin (tags);
+
+create table osm_line (
+    id bigint,
+    tags hstore,
+    shape geography(linestring, 4326),
+    primary key (id)
+);
 
 """)
 
@@ -74,26 +95,24 @@ for _, n in f:
         tags = get_tags(n)
         print('\t'.join((id, pt, tags)))
 
+        last = 'node'
+        clear_node(n)
+
     elif n.tag == 'way':
-        if last != 'way':
+        if last == 'node':
             print('\.\n')
             print('copy _osm_line (id, tags, points) from stdin with null as \'\';')
+
         id = n.get('id')
         tags = get_tags(n)
         points = '{' + ','.join(FIND_NODE_ID(n)) + '}'
         print('\t'.join((id, tags, points)))
+
+        last = 'way'
+        clear_node(n)
+
     elif n.tag == 'relation':
         break
-
-    # clear memory
-    last = n.tag
-    n.clear()
-
-    parent = n.getparent()
-    ps = n.getprevious()
-    while ps is not None:
-        parent.remove(ps)
-        ps = n.getprevious()
 
 print('\.')
 print('commit;')
