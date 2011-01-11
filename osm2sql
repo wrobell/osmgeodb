@@ -161,6 +161,19 @@ from (
     select id, tags, unnest(points) as points
     from _osm_way ol
     where array_length(points, 1) > 1
+        and points[1] <> points[array_length(points, 1)]
+) ol inner join _osm_node op on ol.points = op.id
+group by 1, 2;
+
+insert into osm_area (id, tags, points, shape)
+select ol.id, ol.tags,
+    array_agg(ol.points) as points,
+    st_makepolygon(st_makeline(op.location)) as shape
+from (
+    select id, tags, unnest(points) as points
+    from _osm_way ol
+    where array_length(points, 1) >= 4
+        and points[1] = points[array_length(points, 1)]
 ) ol inner join _osm_node op on ol.points = op.id
 group by 1, 2;
 
