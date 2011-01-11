@@ -54,9 +54,34 @@ Database Schema
 
 osm_point
     OpenStreetMap point (node) data.
+        id
+            Point id.
+        tags
+            Point tags stored as hstore.
+        location
+            Point coordinates in WGS84.
 
 osm_line
     OpenStreetMap waypoint data.
+        id
+            Waypoint id.
+        tags
+            Waypoint tags stored as hstore.
+        points
+            Ids of waypoint points.
+        shape
+            Waypoint linestring in WGS84.
+
+osm_area
+    OpenStreetMap area data.
+        id
+            Area id.
+        tags
+            Area tags stored as hstore.
+        points
+            Ids of area points.
+        shape
+            Area polygon in WGS84.
 
 Indices
 -------
@@ -65,5 +90,8 @@ idx_osm_point_t
     
 idx_osm_line_t
     Tags index for line (waypoint) data.
+
+idx_osm_area_t
+    Tags index for area data.
 
 .. vim: sw=4:et:ai

@@ -25,8 +25,17 @@ import bz2
 import os.path
 import sys
 
-quote = lambda s: s.replace('"', '').replace('\'', '').replace('\\', '')
-get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(k, quote(v))
+# quote string
+# - " -> \\" 
+# - \ -> 4 * \
+# - \n -> <space>
+quote = lambda s: s.replace('\\', '\\\\\\\\') \
+    .replace('"', '\\\\"') \
+    .replace('\x0d\x0a', ' ') \
+    .replace('\x0d', ' ') \
+    .replace('\x0a', ' ')
+
+get_tags = lambda n: ','.join('"{0}" => "{1}"'.format(quote(k), quote(v))
             for k, v in zip(FIND_TAG_K(n), FIND_TAG_V(n)))
 
 def clear_node(n):
@@ -51,10 +60,32 @@ FIND_NODE_ID = et.XPath('nd/@ref')
 print("""
 begin;
 
-drop index if exists idx_osm_point_t;
-drop index if exists idx_osm_line_t;
+drop index if exists _idx_osm_node_t;
+drop index if exists _idx_osm_way_t;
+drop table if exists _osm_node;
+drop table if exists _osm_way;
+
 drop table if exists osm_point;
 drop table if exists osm_line;
+drop table if exists osm_area;
+
+-- temporary tables
+create table _osm_node (
+    id bigint,
+    tags hstore,
+    primary key (id)
+);
+select AddGeometryColumn('_osm_node', 'location', 4326, 'POINT', 2);
+create index _idx_osm_node_t on _osm_node using gin (tags);
+
+create table _osm_way (
+    id bigint,
+    tags hstore,
+    points bigint[],
+    primary key (id)
+);
+create index _idx_osm_way_t on _osm_way using gin (tags);
+
 
 create table osm_point (
     id bigint,
@@ -73,6 +104,15 @@ create table osm_line (
 select AddGeometryColumn('osm_line', 'shape', 4326, 'LINESTRING', 2);
 create index idx_osm_line_t on osm_line using gin (tags);
 
+create table osm_area (
+    id bigint,
+    tags hstore,
+    points bigint[],
+    primary key (id)
+);
+select AddGeometryColumn('osm_area', 'shape', 4326, 'POLYGON', 2);
+create index idx_osm_area_t on osm_area using gin (tags);
+
 """)
 
 fin = sys.argv[1]
@@ -81,7 +121,7 @@ if os.path.splitext(fin)[1] == '.bz2':
 
 last = ''
 f = et.iterparse(fin)
-print("copy osm_point (id, location, tags) from stdin with null as \'\';")
+print("copy _osm_node (id, location, tags) from stdin with null as \'\';")
 for _, n in f:
     if n.tag == 'node':
         id = n.get('id')
@@ -95,7 +135,7 @@ for _, n in f:
     elif n.tag == 'way':
         if last == 'node':
             print('\.\n')
-            print('copy osm_line (id, tags, points) from stdin with null as \'\';')
+            print('copy _osm_way (id, tags, points) from stdin with null as \'\';')
 
         id = n.get('id')
         tags = get_tags(n)
@@ -107,8 +147,28 @@ for _, n in f:
 
     elif n.tag == 'relation':
         break
+    elif n.tag == 'changeset':
+        clear_node(n)
+        continue
 
 print('\.')
+print("""
+insert into osm_line (id, tags, points, shape)
+select ol.id, ol.tags,
+    array_agg(ol.points) as points,
+    st_makeline(op.location) as shape
+from (
+    select id, tags, unnest(points) as points
+    from _osm_way ol
+    where array_length(points, 1) > 1
+) ol inner join _osm_node op on ol.points = op.id
+group by 1, 2;
+
+drop index _idx_osm_node_t;
+drop index _idx_osm_way_t;
+drop table _osm_node;
+drop table _osm_way;
+""")
 print('commit;')
 
 # vim: sw=4:et:ai
