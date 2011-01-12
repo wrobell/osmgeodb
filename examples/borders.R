@@ -10,7 +10,7 @@ where ((tags->'admin_level') = '2')")
 
 cn = dbConnect(PostgreSQL(), dbname='pl')
 d = dbGetQuery(cn, q)
-coords = readWKT(paste("GEOMETRYCOLLECTION(", paste(d$shape, collapse=","), ")", sep=""))
+coords = readWKT(paste('GEOMETRYCOLLECTION(', paste(d$shape, collapse=','), ')', sep=''))
 data = SpatialLinesDataFrame(coords, d)
 
 pdf('borders.pdf', title='Borders')

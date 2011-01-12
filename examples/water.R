@@ -11,7 +11,7 @@ where ((tags->'natural') = 'water')")
 
 cn = dbConnect(PostgreSQL(), dbname='pl')
 d = dbGetQuery(cn, q)
-coords = readWKT(paste("GEOMETRYCOLLECTION(", paste(d$shape, collapse=","), ")", sep=""))
+coords = readWKT(paste('GEOMETRYCOLLECTION(', paste(d$shape, collapse=','), ')', sep=''))
 data = SpatialPolygonsDataFrame(coords, d)
 
 pdf('water.pdf', title='Water')
