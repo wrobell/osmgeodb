@@ -4,10 +4,9 @@ library(rgeos)
 q = sprintf("
 select 
     id,
-    points::varchar,
     st_astext(shape) as shape
 from osm_line ol
-where ((tags->'admin_level') = '%s')", 2)
+where ((tags->'admin_level') = '2')")
 
 cn = dbConnect(PostgreSQL(), dbname='pl')
 d = dbGetQuery(cn, q)
