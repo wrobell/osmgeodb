@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 #
 # osm2sql - script to convert OpenStreetMap data into SQL spatial database.
 #
-# Copyright (C) 2009 by Artur Wroblewski <wrobell@pld-linux.org>
+# Copyright (C) 2011 by Artur Wroblewski <wrobell@pld-linux.org>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,13 +19,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import print_function
 
-import lxml.etree as et
 import bz2
-import os.path
-import sys
-import bsddb3 as bsddb
+import datetime
+import lxml.etree as et
+import mmap
 import struct
+import sys
 
 # quote string
 # - " -> \\" 
@@ -40,7 +41,35 @@ quote = lambda s: s.replace('\\', '\\\\\\\\') \
 
 # format tags into SQL string
 get_tags = lambda n: '\'' + (','.join('"{0}" => "{1}"'.format(quote(k), quote(v))
-            for k, v in zip(FIND_TAG_K(n), FIND_TAG_V(n)))) + '\''
+            for k, v in zip(find_tag_k(n), find_tag_v(n)))) + '\''
+
+fmt_point = '\'SRID=4326;POINT({} {})\''.format
+fmt_line = '\'SRID=4326;LINESTRING({})\''.format
+fmt_polygon = '\'SRID=4326;POLYGON(({}))\''.format
+fmt_array = lambda l: 'array[{}]'.format(','.join(l))
+
+find_tag_k = et.XPath('tag/@k')
+find_tag_v = et.XPath('tag/@v')
+find_node_id = et.XPath('nd/@ref')
+
+def getp(idx, id):
+    """
+    Get point information from mmap based index at position 'id'. 
+    """
+    idx.seek(int(id) * 8)
+    return struct.unpack('ff', idx.read(8))
+
+
+def putp(idx, id, data):
+    """
+    Put point information into mmap based index.
+    """
+    pos = int(id) * 8
+    if idx.size() <= pos + 8: # increase index by 256MB
+        idx.resize(pos + 8 + 256 * 1024 ** 2)
+    idx.seek(pos)
+    idx.write(data)
+
 
 def print_sql(table, *values):
     """
@@ -60,16 +89,6 @@ def clear_node(n):
     while ps is not None:
         parent.remove(ps)
         ps = n.getprevious()
-
-
-FMT_POINT = '\'SRID=4326;POINT({} {})\''.format
-FMT_LINE = '\'SRID=4326;LINESTRING({})\''.format
-FMT_POLYGON = '\'SRID=4326;POLYGON(({}))\''.format
-FMT_ARRAY = lambda l: 'array[{}]'.format(','.join(l))
-
-FIND_TAG_K = et.XPath('tag/@k')
-FIND_TAG_V = et.XPath('tag/@v')
-FIND_NODE_ID = et.XPath('nd/@ref')
 
 print("""
 begin;
@@ -106,47 +125,49 @@ create index idx_osm_area_t on osm_area using gin (tags);
 
 """)
 
-fin = sys.argv[1]
-if os.path.splitext(fin)[1] == '.bz2':
-    fin = bz2.BZ2File(fin)
+fin = sys.stdin.detach() # get binary version of stdin
+f = et.iterparse(fin, encoding='utf-8')
 
-f = et.iterparse(fin)
-cachesize = 512 * 1024 ** 2
-#idx = bsddb.hashopen('osm.idx', 'n', cachesize=cachesize)
-idx = bsddb.btopen('osm.idx', 'n', cachesize=cachesize)
-cnt = 0
+fm = open('osm.idx', 'w+b')
+fm.write(b'\x00')
+fm.flush()
+
+idx = mmap.mmap(fm.fileno(), 0)
+
+c_n = 0 # count nodes
+c_nr = 0 # count node references
 for _, n in f:
     if n.tag == 'node':
-        cnt += 1
-        id = n.get('id').encode()
-        #pt = '{} {}'.format(n.get('lon'), n.get('lat'))
+        c_n += 1
+
         pt = struct.pack('ff', float(n.get('lon')), float(n.get('lat')))
-        #tags = get_tags(n)
-        idx[id] = pt
+        putp(idx, n.get('id'), pt)
 
         clear_node(n)
-        if cnt % 100000 == 0:
-            import datetime
-            print('node', cnt, datetime.datetime.now(), file=sys.stderr)
+        if c_n % 100000 == 0:
+            print('node', c_n, datetime.datetime.now(), '', file=sys.stderr,
+                sep=',')
 
     elif n.tag == 'way':
-        cnt += 1
+        c_n += 1
+
         id = n.get('id')
         tags = get_tags(n)
-        p_id = [p for p in FIND_NODE_ID(n)]
-        p_g = ','.join('{} {}'.format(*struct.unpack('ff', idx[p.encode()])) for p in p_id)
-        if len(p_id) > 1 and p_id[0] != p_id[-1]:
-            print_sql('osm_line', id, tags, FMT_ARRAY(p_id), FMT_LINE(p_g))
-        elif len(p_id) > 3 and p_id[0] == p_id[-1]:
-            print_sql('osm_area', id, tags, FMT_ARRAY(p_id), FMT_POLYGON(p_g))
+        p_id = [p for p in find_node_id(n)]
 
-        #points = ','.join((idx[p.encode()].decode() for p in FIND_NODE_ID(n)))
-        #print('\t'.join((id, tags, points)))
+        c_nr += len(p_id)
+
+        p_g = ','.join('{:0.6f} {:0.6f}'.format(*getp(idx, p)) for p in p_id)
+        if len(p_id) > 1 and p_id[0] != p_id[-1]:
+            print_sql('osm_line', id, tags, fmt_array(p_id), fmt_line(p_g))
+        elif len(p_id) > 3 and p_id[0] == p_id[-1]:
+            print_sql('osm_area', id, tags, fmt_array(p_id), fmt_polygon(p_g))
 
         clear_node(n)
-        if cnt % 100000 == 0:
-            import datetime
-            print('waypoint', cnt, datetime.datetime.now(), file=sys.stderr)
+        if c_n % 100000 == 0:
+            print('waypoint', c_n, datetime.datetime.now(), c_nr,
+                file=sys.stderr, sep=',')
+            c_nr = 0
 
     elif n.tag == 'relation':
         break
@@ -155,5 +176,6 @@ for _, n in f:
         continue
 
 print('commit;')
+idx.close()
 
 # vim: sw=4:et:ai
