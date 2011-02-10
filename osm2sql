@@ -46,7 +46,6 @@ get_tags = lambda n: '\'' + (','.join('"{0}" => "{1}"'.format(quote(k), quote(v)
 fmt_point = '\'SRID=4326;POINT({} {})\''.format
 fmt_line = '\'SRID=4326;LINESTRING({})\''.format
 fmt_polygon = '\'SRID=4326;POLYGON(({}))\''.format
-fmt_array = lambda l: 'array[{}]'.format(','.join(l))
 
 find_tag_k = et.XPath('tag/@k')
 find_tag_v = et.XPath('tag/@v')
@@ -108,7 +107,6 @@ create index idx_osm_point_t on osm_point using gin (tags);
 create table osm_line (
     id bigint,
     tags hstore,
-    points bigint[],
     primary key (id)
 );
 select AddGeometryColumn('osm_line', 'shape', 4326, 'LINESTRING', 2);
@@ -117,7 +115,6 @@ create index idx_osm_line_t on osm_line using gin (tags);
 create table osm_area (
     id bigint,
     tags hstore,
-    points bigint[],
     primary key (id)
 );
 select AddGeometryColumn('osm_area', 'shape', 4326, 'POLYGON', 2);
@@ -153,15 +150,15 @@ for _, n in f:
 
         id = n.get('id')
         tags = get_tags(n)
-        p_id = [p for p in find_node_id(n)]
+        p_id = (p for p in find_node_id(n))
 
         c_nr += len(p_id)
 
         p_g = ','.join('{:0.6f} {:0.6f}'.format(*getp(idx, p)) for p in p_id)
         if len(p_id) > 1 and p_id[0] != p_id[-1]:
-            print_sql('osm_line', id, tags, fmt_array(p_id), fmt_line(p_g))
+            print_sql('osm_line', id, tags, fmt_line(p_g))
         elif len(p_id) > 3 and p_id[0] == p_id[-1]:
-            print_sql('osm_area', id, tags, fmt_array(p_id), fmt_polygon(p_g))
+            print_sql('osm_area', id, tags, fmt_polygon(p_g))
 
         clear_node(n)
         if c_n % 100000 == 0:

@@ -103,24 +103,20 @@ osm_point
             Point coordinates in WGS84.
 
 osm_line
-    OpenStreetMap waypoint data.
+    OpenStreetMap line data (based on OSM waypoints).
         id
             Waypoint id.
         tags
             Waypoint tags stored as hstore.
-        points
-            Ids of waypoint points.
         shape
             Waypoint linestring in WGS84.
 
 osm_area
-    OpenStreetMap area data.
+    OpenStreetMap area data (based on OSM waypoints).
         id
             Area id.
         tags
             Area tags stored as hstore.
-        points
-            Ids of area points.
         shape
             Area polygon in WGS84.
 
@@ -133,6 +129,6 @@ idx_osm_line_t
     Tags index for line (waypoint) data.
 
 idx_osm_area_t
-    Tags index for area data.
+    Tags index for area (closed waypoint) data.
 
 .. vim: sw=4:et:ai
