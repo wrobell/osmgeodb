@@ -1,3 +1,5 @@
+.. contents::
+
 The osm2sql script
 ==================
 The osm2sql script converts OpenStreetMap data (OSM files) into SQL spatial
@@ -11,26 +13,31 @@ The script supports 2nd step of the following workflow
 - convert spatial data from initial schema to database schema supported by
   an application
 
-The advantage of the script is that very small amount of memory is being
-used while uploading large OpenStreetMap files.
+The advantage of the script is that appropriate amount of memory is being
+used for given hardware configuration while uploading large OpenStreetMap
+files by the script itself.
 
 At the moment it was tested only with PostgreSQL 9.0.2 and Postgis 1.5.2.
 
+*The script is distributed under version 3 of GPL license.*
+
 Requirements
 ------------
-The osm2sql Script
-^^^^^^^^^^^^^^^^^^
+Software
+^^^^^^^^
 #. Python 3.
 #. The lxml library.
 
 Database System
 ^^^^^^^^^^^^^^^
-#. Database system has to support hstore datatype.
+#. Database system has to support hstore-like datatype.
 #. Database system has to be OpenGIS Simple Features specification compliant.
 
-License
--------
-The script is distributed under GPL version 3 license.
+Hardware
+^^^^^^^^
+10GB of disk space is required to create an index for osm2sql processing.
+This does not specify amount of space required for database being a result
+of such processing.
 
 Usage
 =====
@@ -47,7 +54,39 @@ For example, if using PostgreSQL and Postgis::
     psql -f $PGCONTRIB/hstore.sql
     psql -f $PGCONTRIB/postgis.sql
     psql -f $PGCONTRIB/spatial_ref_sys.sql 
-    osm2sql data/planet.osm.bz2 | psql db
+
+then the data can be uploaded with following command::
+
+    bzip2 -dc < planet.osm.bz2 | osm2sql | psql db
+
+Uploading can be performed while downloading the dataset::
+
+    wget -O http://.../planet.osm.bz2 | tee planet.osm.bz2 | bzip2 -dc | osm2sql | psql db
+
+Performance
+===========
+To process OpenStreetMap XML file format point index is created on a disk
+by osm2sql script. This allows to create lines and areas from OSM waypoint data.
+
+The amount of RAM affects the performance of the processing. More memory
+allows to cache more of the data contained in point index and therefore
+faster access to items in the index.
+
+With commodity hardware big part of point index cannot be cached and has to
+be read from a disk. The disk latency (seek time) greatly affects the
+performance of the osm2sql script.  Typical IDE/SATA hard drive is the
+worst solution. SCSI hard drives in RAID-O configuration might help (not
+tested). Simple, 16GB USB key (flash memory) can speed up the processing
+4-5 times, i.e. during performance testing with European dataset, the
+processing time was reduced from 24h (SATA HDD) to 5.5 hours (USB key). SSD
+hard drive probably will be even better.
+
+While the script is single threaded, the amount of CPUs (CPUs cores) and
+their capabilities (i.e. HyperThreading) affect the performance of the
+whole workflow, i.e. each of the steps like the decompression of OSM data,
+osm2sql processing and upload to a database are performed in separate
+processes and will utilize multicore or/and multiprocessor hardware
+architecture.
 
 Database Schema
 ===============
