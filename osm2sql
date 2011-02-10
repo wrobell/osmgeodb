@@ -55,19 +55,18 @@ def getp(idx, id):
     """
     Get point information from mmap based index at position 'id'. 
     """
-    idx.seek(int(id) * 8)
-    return struct.unpack('ff', idx.read(8))
+    pos = int(id) * 8
+    return struct.unpack('ff', idx[pos:pos + 8])
 
 
-def putp(idx, id, data):
+def putp(idx, id, lon, lat):
     """
     Put point information into mmap based index.
     """
     pos = int(id) * 8
     if idx.size() <= pos + 8: # increase index by 256MB
         idx.resize(pos + 8 + 256 * 1024 ** 2)
-    idx.seek(pos)
-    idx.write(data)
+    idx[pos:pos + 8] = struct.pack('ff', float(lon), float(lat))
 
 
 def print_sql(table, *values):
@@ -137,8 +136,7 @@ for _, n in f:
     if n.tag == 'node':
         c_n += 1
 
-        pt = struct.pack('ff', float(n.get('lon')), float(n.get('lat')))
-        putp(idx, n.get('id'), pt)
+        putp(idx, n.get('id'), n.get('lon'), n.get('lat'))
 
         clear_node(n)
         if c_n % 100000 == 0:
@@ -150,7 +148,7 @@ for _, n in f:
 
         id = n.get('id')
         tags = get_tags(n)
-        p_id = (p for p in find_node_id(n))
+        p_id = [p for p in find_node_id(n)]
 
         c_nr += len(p_id)
 
