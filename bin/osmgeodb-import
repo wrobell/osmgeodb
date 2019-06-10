@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-
 #
-# osm2sql - script to convert OpenStreetMap data into SQL spatial database.
-#
-# Copyright (C) 2011 by Artur Wroblewski <wrobell@pld-linux.org>
+# osmgeodb - GIS database for OpenStreetMap data
+# 
+# Copyright (C) 2011-2019 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,158 +18,79 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __future__ import print_function
+import argparse
+import asyncio
+import time
+import uvloop
+import zmq
 
-import bz2
-import datetime
-import lxml.etree as et
-import mmap
-import struct
-import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
+from zmq.asyncio import Context
+from zmq.utils.monitor import parse_monitor_message
 
-# quote string
-# - " -> \\" 
-# - \ -> 4 * \
-# - \n -> <space>
-quote = lambda s: s.replace('\\', '\\\\\\\\') \
-    .replace('\'', '\'\'') \
-    .replace('"', '\\\\"') \
-    .replace('\x0d\x0a', ' ') \
-    .replace('\x0d', ' ') \
-    .replace('\x0a', ' ')
+from osmgeodb.posindex import receive_pos_index, send_pos_index
+from osmgeodb.reader import read_messages
+from osmgeodb.parser import process_messages
+from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
 
-# format tags into SQL string
-get_tags = lambda n: '\'' + (','.join('"{0}" => "{1}"'.format(quote(k), quote(v))
-            for k, v in zip(find_tag_k(n), find_tag_v(n)))) + '\''
+def get_loop():
+    uvloop.install()
+    loop = asyncio.get_event_loop()
+    return loop
 
-fmt_point = '\'SRID=4326;POINT({} {})\''.format
-fmt_line = '\'SRID=4326;LINESTRING({})\''.format
-fmt_polygon = '\'SRID=4326;POLYGON(({}))\''.format
+def osm_reader(fn):
+    loop = get_loop()
 
-find_tag_k = et.XPath('tag/@k')
-find_tag_v = et.XPath('tag/@v')
-find_node_id = et.XPath('nd/@ref')
+    with open(fn, 'rb') as f:
+        messages = read_messages(f)
+        task = send_messages(messages)
+        loop.run_until_complete(task)
 
-def getp(idx, id):
-    """
-    Get point information from mmap based index at position 'id'. 
-    """
-    pos = int(id) * 8
-    return struct.unpack('ff', idx[pos:pos + 8])
+def osm_parser():
+    loop = get_loop()
 
+    ctx = zmq.asyncio.Context()
+    socket = ctx.socket(zmq.PULL)
+    socket.connect('tcp://127.0.0.1:5557')
 
-def putp(idx, id, lon, lat):
-    """
-    Put point information into mmap based index.
-    """
-    pos = int(id) * 8
-    if idx.size() <= pos + 8: # increase index by 256MB
-        idx.resize(pos + 8 + 256 * 1024 ** 2)
-    idx[pos:pos + 8] = struct.pack('ff', float(lon), float(lat))
+    queue = asyncio.Queue(32)
+    t0 = send_pos_index(queue)
+    processor = {
+        'dense_nodes': queue,
+    }
+    t1 = exit_on_cancel(process_messages(socket, processor))
+    t2 = monitor_socket(socket, zmq.EVENT_CLOSED)
+    loop.run_until_complete(asyncio.gather(t1, t2, t0))
 
+def collector():
+    loop = get_loop()
 
-def print_sql(table, *values):
-    """
-    Print SQL insert statements for specified table and values.
-    """
-    print('insert into {} values({});'.format(table, ','.join(values)))
+    ctx = zmq.asyncio.Context()
+    socket = ctx.socket(zmq.PULL)
+    socket.bind('tcp://127.0.0.1:5558')
+
+    t1 = exit_on_cancel(receive_pos_index(socket))
+    t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
+
+    loop.run_until_complete(asyncio.gather(t1, t2))
 
 
-def clear_node(n):
-    """
-    Clear memory after parsing a node with ElementTree API.
-    """
-    n.clear()
+parser = argparse.ArgumentParser(description='osmgeodb')
+parser.add_argument('input', help='OSM data file')
 
-    parent = n.getparent()
-    ps = n.getprevious()
-    while ps is not None:
-        parent.remove(ps)
-        ps = n.getprevious()
+args = parser.parse_args()
 
-print("""
-begin;
+with ProcessPoolExecutor() as pool:
+    tasks = [
+        partial(osm_reader, args.input),
+        collector,
+    ]
+    tasks.extend([osm_parser] * 4)
+    tasks = [pool.submit(f) for f in tasks]
+    for t in as_completed(tasks):
+        print(t.result(), 'done')
 
-drop table if exists osm_point;
-drop table if exists osm_line;
-drop table if exists osm_area;
-
-create table osm_point (
-    id bigint,
-    tags hstore,
-    primary key (id)
-);
-select AddGeometryColumn('osm_point', 'location', 4326, 'POINT', 2);
-create index idx_osm_point_t on osm_point using gin (tags);
-
-create table osm_line (
-    id bigint,
-    tags hstore,
-    primary key (id)
-);
-select AddGeometryColumn('osm_line', 'shape', 4326, 'LINESTRING', 2);
-create index idx_osm_line_t on osm_line using gin (tags);
-
-create table osm_area (
-    id bigint,
-    tags hstore,
-    primary key (id)
-);
-select AddGeometryColumn('osm_area', 'shape', 4326, 'POLYGON', 2);
-create index idx_osm_area_t on osm_area using gin (tags);
-
-""")
-
-fin = sys.stdin.detach() # get binary version of stdin
-f = et.iterparse(fin, encoding='utf-8')
-
-fm = open('osm.idx', 'w+b')
-fm.write(b'\x00')
-fm.flush()
-
-idx = mmap.mmap(fm.fileno(), 0)
-
-c_n = 0 # count nodes
-c_nr = 0 # count node references
-for _, n in f:
-    if n.tag == 'node':
-        c_n += 1
-
-        putp(idx, n.get('id'), n.get('lon'), n.get('lat'))
-
-        clear_node(n)
-        if c_n % 100000 == 0:
-            print('node', c_n, datetime.datetime.now(), '', file=sys.stderr,
-                sep=',')
-
-    elif n.tag == 'way':
-        c_n += 1
-
-        id = n.get('id')
-        tags = get_tags(n)
-        p_id = [p for p in find_node_id(n)]
-
-        c_nr += len(p_id)
-
-        p_g = ','.join('{:0.6f} {:0.6f}'.format(*getp(idx, p)) for p in p_id)
-        if len(p_id) > 1 and p_id[0] != p_id[-1]:
-            print_sql('osm_line', id, tags, fmt_line(p_g))
-        elif len(p_id) > 3 and p_id[0] == p_id[-1]:
-            print_sql('osm_area', id, tags, fmt_polygon(p_g))
-
-        clear_node(n)
-        if c_n % 100000 == 0:
-            print('waypoint', c_n, datetime.datetime.now(), c_nr,
-                file=sys.stderr, sep=',')
-            c_nr = 0
-
-    elif n.tag == 'relation':
-        break
-    elif n.tag == 'changeset':
-        clear_node(n)
-        continue
-
-print('commit;')
-idx.close()
+print('done all')
 
 # vim: sw=4:et:ai
