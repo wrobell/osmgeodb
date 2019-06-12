@@ -29,7 +29,8 @@ from functools import partial
 from zmq.asyncio import Context
 from zmq.utils.monitor import parse_monitor_message
 
-from osmgeodb.posindex import receive_pos_index, send_pos_index
+from osmgeodb.posindex import receive_pos_index, send_pos_index,
+create_pos_index
 from osmgeodb.reader import read_messages
 from osmgeodb.parser import process_messages
 from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
@@ -70,7 +71,8 @@ def collector():
     socket = ctx.socket(zmq.PULL)
     socket.bind('tcp://127.0.0.1:5558')
 
-    t1 = exit_on_cancel(receive_pos_index(socket))
+    pos_index = create_pos_index()
+    t1 = exit_on_cancel(receive_pos_index(socket, pos_index))
     t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
 
     loop.run_until_complete(asyncio.gather(t1, t2))
