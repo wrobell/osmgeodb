@@ -64,6 +64,9 @@ def osm_parser():
     loop.run_until_complete(asyncio.gather(t1, t2, t0))
 
 def collector():
+    """
+    Process to store OSM data and to create index of OSM positions.
+    """
     loop = get_loop()
 
     ctx = zmq.asyncio.Context()
