@@ -35,11 +35,19 @@ from osmgeodb.parser import process_messages
 from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
 
 def get_loop():
+    """
+    Install uvloop and return asyncio event loop.
+    """
     uvloop.install()
     loop = asyncio.get_event_loop()
     return loop
 
 def osm_reader(fn):
+    """
+    Read data from OSM PBF file and send it to data processors.
+
+    :param fn: OSM PBF file name.
+    """
     loop = get_loop()
 
     with open(fn, 'rb') as f:
