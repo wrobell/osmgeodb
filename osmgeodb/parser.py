@@ -17,18 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
-import cytoolz.itertoolz as itz
-import msgpack
 import numpy as np
-import uvloop
 import zlib
-import zmq
-import sys
-
-from functools import partial
-from zmq.asyncio import Context
-from zmq.utils.monitor import parse_monitor_message
 
 from osmgeodb.osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
 from osmgeodb.mpack import m_pack, m_unpack

@@ -20,7 +20,7 @@
 
 import argparse
 import asyncio
-import time
+import logging
 import uvloop
 import zmq
 
@@ -33,6 +33,8 @@ from osmgeodb.posindex import receive_pos_index, send_pos_index, create_pos_inde
 from osmgeodb.reader import read_messages
 from osmgeodb.parser import process_messages
 from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
+
+logger = logging.getLogger(__name__)
 
 def get_loop():
     """
@@ -67,7 +69,7 @@ def osm_parser():
     processor = {
         'dense_nodes': queue,
     }
-    t1 = exit_on_cancel(process_messages(socket, processor))
+    t1 = process_messages(socket, processor)
     t2 = monitor_socket(socket, zmq.EVENT_CLOSED)
     loop.run_until_complete(asyncio.gather(t1, t2, t0))
 
@@ -93,6 +95,8 @@ parser.add_argument('input', help='OSM data file')
 
 args = parser.parse_args()
 
+logging.basicConfig(level=logging.DEBUG)
+
 with ProcessPoolExecutor() as pool:
     tasks = [
         partial(osm_reader, args.input),
@@ -101,8 +105,9 @@ with ProcessPoolExecutor() as pool:
     tasks.extend([osm_parser] * 4)
     tasks = [pool.submit(f) for f in tasks]
     for t in as_completed(tasks):
-        print(t.result(), 'done')
+        t.result()
+        logger.info('a process done')
 
-print('done all')
+logger.info('all processes done')
 
 # vim: sw=4:et:ai
