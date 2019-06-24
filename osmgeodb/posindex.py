@@ -54,9 +54,13 @@ async def send_pos_index(queue):
     ctx = zmq.asyncio.Context()
     socket = ctx.socket(zmq.PUSH)
     socket.connect('tcp://127.0.0.1:5558')
-    while True:
-        pos, group = await queue.get()
-        await socket.send(m_pack((pos, group.id[0])))
+    try:
+        while True:
+            pos, group = await queue.get()
+            await socket.send(m_pack((pos, group.id[0])))
+    finally:
+        # force exit of indexer with small linger value
+        socket.close(100)
 
 def create_pos_index() -> SortedKeyList:
     """

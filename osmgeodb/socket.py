@@ -19,8 +19,9 @@
 
 import asyncio
 import logging
-import os
 import zmq
+
+from zmq.utils.monitor import parse_monitor_message
 
 from .mpack import m_pack
 
@@ -48,13 +49,16 @@ async def send_messages(messages):
     socket.bind('tcp://127.0.0.1:5557')
 
     try:
-        for msg in messages:
-            await socket.send(m_pack(msg))
+        t1 = _send_messages(socket, messages)
+        t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
+        await asyncio.gather(t1, t2)
     finally:
-        logger.info('sent all messages')
         socket.close()
-        ctx.term()
-        logger.info('socket closed')
+        logger.info('sent all messages')
+
+async def _send_messages(socket, messages):
+    for msg in messages:
+        await socket.send(m_pack(msg))
 
 async def exit_on_cancel(task):
     try:

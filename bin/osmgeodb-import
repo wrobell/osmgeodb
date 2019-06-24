@@ -27,7 +27,6 @@ import zmq
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
 from zmq.asyncio import Context
-from zmq.utils.monitor import parse_monitor_message
 
 from osmgeodb.posindex import receive_pos_index, send_pos_index, create_pos_index
 from osmgeodb.reader import read_messages
@@ -55,9 +54,16 @@ def osm_reader(fn):
     with open(fn, 'rb') as f:
         messages = read_messages(f)
         task = send_messages(messages)
-        loop.run_until_complete(task)
+        try:
+            loop.run_until_complete(task)
+        finally:
+            logger.info('reader exit')
 
-def osm_parser():
+def osm_processor():
+    """
+    Process OSM nodes, ways and relations and store them as positions,
+    lines and areas.
+    """
     loop = get_loop()
 
     ctx = zmq.asyncio.Context()
@@ -71,11 +77,16 @@ def osm_parser():
     }
     t1 = process_messages(socket, processor)
     t2 = monitor_socket(socket, zmq.EVENT_CLOSED)
-    loop.run_until_complete(asyncio.gather(t1, t2, t0))
+    try:
+        loop.run_until_complete(asyncio.gather(t1, t2, t0))
+    finally:
+        t0.close()
+        socket.close()
+        logger.info('processor exit')
 
 def collector():
     """
-    Process to store OSM data and to create index of OSM positions.
+    Create index of OSM nodes and OSM ways.
     """
     loop = get_loop()
 
@@ -87,7 +98,10 @@ def collector():
     t1 = exit_on_cancel(receive_pos_index(socket, pos_index))
     t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
 
-    loop.run_until_complete(asyncio.gather(t1, t2))
+    try:
+        loop.run_until_complete(asyncio.gather(t1, t2))
+    finally:
+        logger.info('collector exit')
 
 
 parser = argparse.ArgumentParser(description='osmgeodb')
@@ -102,11 +116,10 @@ with ProcessPoolExecutor() as pool:
         partial(osm_reader, args.input),
         collector,
     ]
-    tasks.extend([osm_parser] * 4)
+    tasks.extend([osm_processor] * 4)
     tasks = [pool.submit(f) for f in tasks]
     for t in as_completed(tasks):
         t.result()
-        logger.info('a process done')
 
 logger.info('all processes done')
 
