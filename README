@@ -53,7 +53,7 @@ For example, if using PostgreSQL and Postgis::
     createdb db
     psql -f $PGCONTRIB/hstore.sql
     psql -f $PGCONTRIB/postgis.sql
-    psql -f $PGCONTRIB/spatial_ref_sys.sql 
+    psql -f $PGCONTRIB/spatial_ref_sys.sql
 
 then the data can be uploaded with following command::
 
@@ -124,7 +124,7 @@ Indices
 -------
 idx_osm_point_t
     Tags index for point (node) data.
-    
+   
 idx_osm_line_t
     Tags index for line (waypoint) data.
 

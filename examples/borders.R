@@ -2,7 +2,7 @@ require(RPostgreSQL)
 library(rgeos)
 
 q = sprintf("
-select 
+select
     id,
     st_astext(shape) as shape
 from osm_line ol

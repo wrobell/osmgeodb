@@ -1,6 +1,6 @@
 #
 # osmgeodb - GIS database for OpenStreetMap data
-# 
+#
 # Copyright (C) 2011-2019 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify

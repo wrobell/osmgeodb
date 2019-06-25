@@ -2,7 +2,7 @@ require(RPostgreSQL)
 library(rgeos)
 
 q = sprintf("
-select 
+select
     id,
     (tags->'name'),
     st_astext(shape) as shape
