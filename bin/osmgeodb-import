@@ -32,6 +32,7 @@ from osmgeodb.posindex import receive_pos_index, send_pos_index, create_pos_inde
 from osmgeodb.reader import read_messages
 from osmgeodb.processor import process_messages
 from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
+from osmgeodb.storage import store_data
 
 logger = logging.getLogger(__name__)
 
@@ -70,17 +71,18 @@ def osm_processor():
     socket = ctx.socket(zmq.PULL)
     socket.connect('tcp://127.0.0.1:5557')
 
-    queue = asyncio.Queue(32)
-    t0 = send_pos_index(queue)
-    processor = {
-        'dense_nodes': queue,
-    }
-    t1 = process_messages(socket, processor)
+    q_index = asyncio.Queue(64)
+    q_store = asyncio.Queue(64)
+
+    t1 = process_messages(socket, q_index, q_store)
     t2 = monitor_socket(socket, zmq.EVENT_CLOSED)
+    t3 = send_pos_index(q_index)
+    t4 = store_data('postgresql://localhost/osmgeodb', q_store)
     try:
-        loop.run_until_complete(asyncio.gather(t1, t2, t0))
+        loop.run_until_complete(asyncio.gather(t1, t2, t3, t4))
     finally:
-        t0.close()
+        t3.close()
+        t4.close()
         socket.close()
         logger.info('processor exit')
 

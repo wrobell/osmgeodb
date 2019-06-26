@@ -17,24 +17,26 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import numpy as np
 import zlib
 
-from osmgeodb.osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
-from osmgeodb.mpack import m_pack, m_unpack
+from .osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
+from .mpack import m_pack, m_unpack
+from .parser import parse_dense_nodes
+from .posindex import create_index_entry
 
-async def process_messages(socket, processor_queue):
+async def process_messages(socket, q_index, q_store):
     while True:
         data = await socket.recv()
-        pos, data = m_unpack(data)
+        file_pos, data = m_unpack(data)
 
         data = zlib.decompress(data)
         block = PrimitiveBlock()
         block.ParseFromString(data)
 
         for type, group in detect_block_groups(block):
-            queue = processor_queue[type]
-            await queue.put((pos, group))
+            data = PARSERS[type](block, group)
+            await q_index.put(create_index_entry(type, file_pos, group))
+            await q_store.put(data)
 
 def detect_group(group):
     if len(group.dense.id):
@@ -53,23 +55,8 @@ def detect_block_groups(block):
     items = (detect_group(g) for g in block.primitivegroup)
     yield from items
 
-def parse_dense_nodes(block, data):
-    granularity = block.granularity
-    lon_offset = block.lon_offset
-    lat_offset = block.lat_offset
-
-    ids = np.array(data.id, dtype=np.int64).cumsum()
-
-    lons = np.array(data.lon, dtype=np.float64).cumsum()
-    lons = (lons * granularity + lon_offset) / 1e9
-
-    lats = np.array(data.lat, dtype=np.float64).cumsum()
-    lats = (lats * granularity + lat_offset) / 1e9
-#    return {
-#        'type': 'dense_nodes',
-#        'ids': ids.tobytes(),
-#        'lons': lons.tobytes(),
-#        'lats': lats.tobytes(),
-#    }
+PARSERS = {
+    'dense_nodes': parse_dense_nodes,
+}
 
 # vim: sw=4:et:ai

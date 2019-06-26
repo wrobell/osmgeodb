@@ -26,6 +26,7 @@ from collections import Counter
 from sortedcontainers import SortedKeyList
 
 from osmgeodb.mpack import m_pack, m_unpack
+from osmgeodb.parser import parse_tags
 
 DATA_COUNTER = Counter()
 
@@ -56,11 +57,14 @@ async def send_pos_index(queue):
     socket.connect('tcp://127.0.0.1:5558')
     try:
         while True:
-            pos, group = await queue.get()
-            await socket.send(m_pack((pos, group.id[0])))
+            item = await queue.get()
+            await socket.send(m_pack(item))
     finally:
         # force exit of indexer with small linger value
         socket.close(100)
+
+def create_index_entry(type, file_pos, group):
+    return type, file_pos, group.id[0]
 
 def create_pos_index() -> SortedKeyList:
     """
@@ -68,6 +72,6 @@ def create_pos_index() -> SortedKeyList:
 
     The new index is empty.
     """
-    return SortedKeyList([], key=operator.itemgetter(1))
+    return SortedKeyList([], key=operator.itemgetter(2))
 
 # vim: sw=4:et:ai
