@@ -34,9 +34,11 @@ async def process_messages(socket, q_index, q_store):
         block.ParseFromString(data)
 
         for type, group in detect_block_groups(block):
-            data = PARSERS[type](block, group)
-            await q_index.put(create_index_entry(type, file_pos, group))
-            await q_store.put(data)
+            f = PARSERS.get(type)
+            if f:
+                data = f(block, group)
+                await q_index.put(create_index_entry(type, file_pos, group))
+                await q_store.put(data)
 
 def detect_group(group):
     if len(group.dense.id):
