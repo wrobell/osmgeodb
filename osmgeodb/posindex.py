@@ -58,6 +58,9 @@ async def send_pos_index(queue):
     try:
         while True:
             item = await queue.get()
+            if item is None:
+                break
+
             await socket.send(m_pack(item))
     finally:
         # force exit of indexer with small linger value

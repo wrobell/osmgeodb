@@ -29,6 +29,9 @@ async def store_data(uri, queue):
         async with conn.transaction():
             while True:
                 items = await queue.get()
+                if items is None:
+                    break
+
                 await conn.copy_records_to_table(
                     'osm_point',
                     columns=('id', 'location', 'tags'),

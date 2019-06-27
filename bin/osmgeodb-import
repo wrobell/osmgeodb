@@ -82,8 +82,6 @@ def osm_processor():
     try:
         loop.run_until_complete(asyncio.gather(t1, t2, t3, t4))
     finally:
-        t3.close()
-        t4.close()
         socket.close()
         logger.info('processor exit')
 
