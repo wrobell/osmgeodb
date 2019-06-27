@@ -20,12 +20,14 @@
 import cytoolz.itertoolz as itz
 import numpy as np
 
-from cytoolz.recipes import partitionby
+from itertools import takewhile
 from shapely.geometry import Point
 
-def parse_tags(indexes, strings):
+def parse_tags(indexes, strings, n):
     strings = [s.decode('utf-8') for s in strings]
-    items = partitionby(lambda v: v == 0, indexes)
+
+    indexes = iter(indexes)
+    items = (takewhile(lambda v: v !=0, indexes) for n in range(n))
     return [
         {strings[k]: strings[v] for k, v in itz.partition(2, item)}
         for item in items
@@ -44,9 +46,11 @@ def parse_dense_nodes(block, data):
     lats = np.array(data.lat, dtype=np.float64).cumsum()
     lats = (lats * granularity + lat_offset) / 1e9
 
-    tags = parse_tags(data.keys_vals, block.stringtable.s)
+    tags = parse_tags(data.keys_vals, block.stringtable.s, len(ids))
 
     items = zip(ids, lons, lats, tags)
-    return [(id, Point(lon, lat), meta) for id, lon, lat, meta in items if meta and meta != {'': ''}]
+
+    # store those positions, which have tags
+    return [(id, Point(lon, lat), meta) for id, lon, lat, meta in items if meta]
 
 # vim: sw=4:et:ai
