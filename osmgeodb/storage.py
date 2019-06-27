@@ -26,15 +26,16 @@ async def store_data(uri, queue):
     await setup_types(conn)
 
     try:
-        while True:
-            items = await queue.get()
-            await conn.copy_records_to_table(
-                'osm_point',
-                columns=('id', 'location', 'tags'),
-                records=items
-            )
+        async with conn.transaction():
+            while True:
+                items = await queue.get()
+                await conn.copy_records_to_table(
+                    'osm_point',
+                    columns=('id', 'location', 'tags'),
+                    records=items
+                )
     finally:
-        conn.close()
+        await conn.close()
 
 async def setup_types(conn):
     # hstore type support
