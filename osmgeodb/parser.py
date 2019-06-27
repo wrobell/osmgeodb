@@ -23,15 +23,23 @@ import numpy as np
 from itertools import takewhile
 from shapely.geometry import Point
 
+BLACKLIST = {'source', 'created_by'}
+
 def parse_tags(indexes, strings, n):
     strings = [s.decode('utf-8') for s in strings]
 
     indexes = iter(indexes)
     items = (takewhile(lambda v: v !=0, indexes) for n in range(n))
-    return [
+    items = (
         {strings[k]: strings[v] for k, v in itz.partition(2, item)}
         for item in items
-    ]
+    )
+    # avoid inserting osm nodes into osm points table, which contain only
+    # blacklisted tags
+    return (
+        {} if BLACKLIST.issuperset(v.keys()) else v
+        for v in items
+    )
 
 def parse_dense_nodes(block, data):
     granularity = block.granularity
