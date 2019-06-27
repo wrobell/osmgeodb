@@ -25,6 +25,7 @@ import uvloop
 import zmq
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import cpu_count
 from functools import partial
 from zmq.asyncio import Context
 
@@ -113,12 +114,14 @@ args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG)
 
-with ProcessPoolExecutor() as pool:
+n_cpu = cpu_count()
+# add low churn reader and indexer processes
+with ProcessPoolExecutor(n_cpu + 2) as pool:
     tasks = [
         partial(osm_reader, args.input),
         collector,
     ]
-    tasks.extend([osm_processor] * 4)
+    tasks.extend([osm_processor] * n_cpu)
     tasks = [pool.submit(f) for f in tasks]
     for t in as_completed(tasks):
         t.result()
