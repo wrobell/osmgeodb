@@ -87,7 +87,7 @@ def osm_processor():
         socket.close()
         logger.info('processor exit')
 
-def collector():
+def data_indexer():
     """
     Create index of OSM nodes and OSM ways.
     """
@@ -104,7 +104,7 @@ def collector():
     try:
         loop.run_until_complete(asyncio.gather(t1, t2))
     finally:
-        logger.info('collector exit')
+        logger.info('data indexer exit')
 
 
 parser = argparse.ArgumentParser(description='osmgeodb')
@@ -119,7 +119,7 @@ n_cpu = cpu_count()
 with ProcessPoolExecutor(n_cpu + 2) as pool:
     tasks = [
         partial(osm_reader, args.input),
-        collector,
+        data_indexer,
     ]
     tasks.extend([osm_processor] * n_cpu)
     tasks = [pool.submit(f) for f in tasks]
