@@ -26,7 +26,7 @@ from .posindex import create_index_entry
 
 async def process_messages(socket, q_index, q_store):
     try:
-        while True:
+        while not socket.closed:
             data = await socket.recv()
             file_pos, data = m_unpack(data)
 
