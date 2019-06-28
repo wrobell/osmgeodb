@@ -46,7 +46,11 @@ setup(
         'Issue tracker': 'https://github.com/wrobell/osmgeodb/issues',
     },
     setup_requires = ['setuptools_git >= 1.0',],
-    install_requires=['sortedcontainers', 'cytoolz >= 0.8.2'],
+    install_requires=[
+        'cytoolz >= 0.8.2',
+        'setproctitle',
+        'sortedcontainers',
+    ],
     classifiers=[
         'Topic :: Software Development :: Libraries',
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
