@@ -27,36 +27,36 @@ from .mpack import m_pack
 
 logger = logging.getLogger(__name__)
 
-async def monitor_socket(socket, event):
+async def monitor_socket(name, socket):
+    """
+    Monitor socket for both being closed and disconnected by other side.
+
+    :param name: Process name. Used for logging.
+    :param socket: 0MQ socket.
+    """
+    title = name
+
+    event = zmq.EVENT_DISCONNECTED | zmq.EVENT_CLOSED
     monitor = socket.get_monitor_socket(event)
     data = await monitor.recv_multipart()
+    monitor.disable_monitor()
     data = parse_monitor_message(data)
 
     if __debug__:
         logger.debug(
-            'waiting for event {}, got {}'.format(event, data['event'])
+            '{}: waiting for event {}, got {}'
+            .format(title, event, data['event'])
         )
 
-    assert data['event'] == event
+    assert data['event'] & event == data['event']
 
-    monitor.disable_monitor()
-    socket.close()
-    logger.info('socket closed')
+    linger = 0 if data['event'] == zmq.EVENT_DISCONNECTED else -1
+    socket.close(linger)
+    if __debug__:
+        logger.debug('{}: socket closed with linger {}'.format(title, linger))
+    logger.info('{}: exit monitor'.format(title))
 
-async def send_messages(messages):
-    ctx = zmq.asyncio.Context()
-    socket = ctx.socket(zmq.PUSH)
-    socket.bind('tcp://127.0.0.1:5557')
-
-    try:
-        t1 = _send_messages(socket, messages)
-        t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
-        await asyncio.gather(t1, t2)
-    finally:
-        socket.close()
-        logger.info('sent all messages')
-
-async def _send_messages(socket, messages):
+async def send_messages(socket, messages):
     for msg in messages:
         await socket.send(m_pack(msg))
 

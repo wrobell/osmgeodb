@@ -55,11 +55,23 @@ def osm_reader(fn):
     setproctitle.setproctitle('osmgeodb: reader')
     loop = get_loop()
 
+    ctx = zmq.asyncio.Context()
+    socket = ctx.socket(zmq.PUSH)
+    socket.bind('tcp://127.0.0.1:5557')
+
     with open(fn, 'rb') as f:
         messages = read_messages(f)
-        task = send_messages(messages)
+        monit = loop.create_task(monitor_socket('reader', socket))
         try:
+            task = send_messages(socket, messages)
             loop.run_until_complete(task)
+
+            # close socket but wait to send all pending data (default linger)
+            socket.close()
+            logger.info('data read and sent successfully')
+        except Exception:
+            socket.close(0)
+            raise
         finally:
             logger.info('reader exit')
 
@@ -79,7 +91,7 @@ def osm_processor():
     q_store = asyncio.Queue(64)
 
     t1 = process_messages(socket, q_index, q_store)
-    t2 = monitor_socket(socket, zmq.EVENT_CLOSED)
+    t2 = monitor_socket('processor', socket)
     t3 = send_pos_index(q_index)
     t4 = store_data('postgresql://localhost/osmgeodb', q_store)
     try:
@@ -101,7 +113,7 @@ def data_indexer():
 
     pos_index = create_pos_index()
     t1 = exit_on_cancel(receive_pos_index(socket, pos_index))
-    t2 = monitor_socket(socket, zmq.EVENT_DISCONNECTED)
+    t2 = monitor_socket('indexer', socket)
 
     try:
         loop.run_until_complete(asyncio.gather(t1, t2))
