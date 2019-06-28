@@ -29,7 +29,7 @@ def test_parse_node_tags():
     """
     indexes = [0, 2, 3, 4, 5, 0, 0, 2, 5, 0, 0]
     strings = [b'', b'', b'b1', b'b2', b'b3', b'b4']
-    tags = parse_tags(indexes, strings, 5)
+    tags = parse_tags(indexes, strings)
 
     expected = [{}, {'b1': 'b2', 'b3': 'b4'}, {}, {'b1': 'b4'}, {}]
     assert expected == tags
@@ -42,7 +42,7 @@ def test_parse_node_tags_blacklist():
     # empty
     indexes = [2, 3, 4, 5, 6, 7, 0, 2, 3, 4, 5, 0, 4, 5, 6, 7]
     strings = [b'', b'', b'source', b's1', b'created_by', b'u1', b'k1', b'v1']
-    tags = parse_tags(indexes, strings, 3)
+    tags = parse_tags(indexes, strings)
 
     expected = [
         {'source': 's1', 'created_by': 'u1', 'k1': 'v1'},
