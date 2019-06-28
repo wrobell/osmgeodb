@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import operator
 import time
 import zmq
@@ -51,20 +52,13 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
             count = DATA_COUNTER['nodes'] / 1e6
             print('nodes[m]: {:,.1f} {:.3f}/s,  index len={}'.format(count, count / td, len(pos_index)))
 
-async def send_pos_index(queue):
-    ctx = zmq.asyncio.Context()
-    socket = ctx.socket(zmq.PUSH)
-    socket.connect('tcp://127.0.0.1:5558')
-    try:
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
+async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
+    while not socket.closed:
+        item = await queue.get()
+        if item is None:
+            break
 
-            await socket.send(m_pack(item))
-    finally:
-        # force exit of indexer with small linger value
-        socket.close(100)
+        await socket.send(m_pack(item))
 
 def create_index_entry(type, file_pos, group):
     return type, file_pos, group.id[0]

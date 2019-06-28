@@ -25,24 +25,23 @@ from .parser import parse_dense_nodes
 from .posindex import create_index_entry
 
 async def process_messages(socket, q_index, q_store):
-    try:
-        while not socket.closed:
-            data = await socket.recv()
-            file_pos, data = m_unpack(data)
+    while not socket.closed:
+        data = await socket.recv()
+        file_pos, data = m_unpack(data)
 
-            data = zlib.decompress(data)
-            block = PrimitiveBlock()
-            block.ParseFromString(data)
+        data = zlib.decompress(data)
+        block = PrimitiveBlock()
+        block.ParseFromString(data)
 
-            for type, group in detect_block_groups(block):
-                f = PARSERS.get(type)
-                if f:
-                    data = f(block, group)
-                    await q_index.put(create_index_entry(type, file_pos, group))
-                    await q_store.put(data)
-    finally:
-        await q_index.put(None)
-        await q_store.put(None)
+        for type, group in detect_block_groups(block):
+            f = PARSERS.get(type)
+            if f:
+                data = f(block, group)
+                await q_index.put(create_index_entry(type, file_pos, group))
+                await q_store.put(data)
+
+    await q_index.put(None)
+    await q_store.put(None)
 
 def detect_group(group):
     if len(group.dense.id):

@@ -60,16 +60,16 @@ def osm_reader(fn):
     socket.bind('tcp://127.0.0.1:5557')
 
     with open(fn, 'rb') as f:
-        messages = read_messages(f)
-        monit = loop.create_task(monitor_socket('reader', socket))
+        loop.create_task(monitor_socket('reader', socket))
         try:
+            messages = read_messages(f)
             task = send_messages(socket, messages)
             loop.run_until_complete(task)
 
             # close socket but wait to send all pending data (default linger)
             socket.close()
             logger.info('data read and sent successfully')
-        except Exception:
+        except:
             socket.close(0)
             raise
         finally:
@@ -87,17 +87,28 @@ def osm_processor():
     socket = ctx.socket(zmq.PULL)
     socket.connect('tcp://127.0.0.1:5557')
 
+    ctx = zmq.asyncio.Context()
+    s_index = ctx.socket(zmq.PUSH)
+    s_index.connect('tcp://127.0.0.1:5558')
+
     q_index = asyncio.Queue(64)
     q_store = asyncio.Queue(64)
 
-    t1 = process_messages(socket, q_index, q_store)
-    t2 = monitor_socket('processor', socket)
-    t3 = send_pos_index(q_index)
-    t4 = store_data('postgresql://localhost/osmgeodb', q_store)
     try:
-        loop.run_until_complete(asyncio.gather(t1, t2, t3, t4))
+        loop.create_task(monitor_socket('processor', socket))
+
+        t1 = process_messages(socket, q_index, q_store)
+        t2 = send_pos_index(s_index, q_index)
+        t3 = store_data('postgresql://localhost/osmgeodb', q_store)
+        loop.run_until_complete(asyncio.gather(t1, t2, t3))
+
+        # force exit of indexer with small linger value
+        s_index.close(100)
+    except:
+        socket.close(0)
+        s_index.close(0)
+        raise
     finally:
-        socket.close()
         logger.info('processor exit')
 
 def data_indexer():
