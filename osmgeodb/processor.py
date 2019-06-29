@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import zlib
 
 from .osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
@@ -26,7 +27,12 @@ from .posindex import create_index_entry
 
 async def process_messages(socket, q_index, q_store):
     while not socket.closed:
-        data = await socket.recv()
+        try:
+            data = await socket.recv()
+        except asyncio.CancelledError as ex:
+            # if socket.recv call is cancelled the socket is closed, so
+            # exit
+            break
         file_pos, data = m_unpack(data)
 
         data = zlib.decompress(data)
