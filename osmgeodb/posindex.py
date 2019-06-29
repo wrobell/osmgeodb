@@ -40,7 +40,7 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
     """
     ts = time.time()
     k = 0
-    while True:
+    while not socket.closed:
         k += 1
         data = await socket.recv()
         item = m_unpack(data)
