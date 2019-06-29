@@ -75,7 +75,7 @@ def osm_reader(fn):
         finally:
             logger.info('reader exit')
 
-def osm_processor():
+def osm_processor(dsn):
     """
     Process OSM nodes, ways and relations and store them as positions,
     lines and areas.
@@ -99,7 +99,7 @@ def osm_processor():
 
         t1 = process_messages(socket, q_index, q_store)
         t2 = send_pos_index(s_index, q_index)
-        t3 = store_data('postgresql://localhost/osmgeodb', q_store)
+        t3 = store_data(dsn, q_store)
         loop.run_until_complete(asyncio.gather(t1, t2, t3))
 
         # force exit of indexer with small linger value
@@ -134,6 +134,7 @@ def data_indexer():
 
 parser = argparse.ArgumentParser(description='osmgeodb')
 parser.add_argument('input', help='OSM data file')
+parser.add_argument('dsn', help='PostgreSQL connection string')
 
 args = parser.parse_args()
 
@@ -146,7 +147,8 @@ with ProcessPoolExecutor(n_cpu + 2) as pool:
         partial(osm_reader, args.input),
         data_indexer,
     ]
-    tasks.extend([osm_processor] * n_cpu)
+    f = partial(osm_processor, args.dsn)
+    tasks.extend([f] * n_cpu)
     tasks = [pool.submit(f) for f in tasks]
     for t in as_completed(tasks):
         t.result()

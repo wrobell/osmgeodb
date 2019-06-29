@@ -21,8 +21,8 @@ import asyncpg
 import shapely.geometry
 import shapely.wkb
 
-async def store_data(uri, queue):
-    conn = await asyncpg.connect(uri)
+async def store_data(dsn, queue):
+    conn = await asyncpg.connect(dsn)
     await setup_types(conn)
 
     try:
