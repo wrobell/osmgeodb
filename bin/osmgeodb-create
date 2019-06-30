@@ -16,10 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-DBNAME="$1"
-
-createdb "$DBNAME"
-psql "$DBNAME" << END
+createdb "$@"
+psql "$@" << END
 create extension postgis;
 create extension hstore;
 
