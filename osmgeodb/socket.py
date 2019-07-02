@@ -21,11 +21,14 @@ import asyncio
 import logging
 import zmq
 
+from zmq.asyncio import Poller
 from zmq.utils.monitor import parse_monitor_message
 
 from .mpack import m_pack
 
 logger = logging.getLogger(__name__)
+
+SOCKET_EVENT = zmq.EVENT_DISCONNECTED | zmq.EVENT_CLOSED
 
 async def monitor_socket(name, socket):
     """
@@ -36,25 +39,37 @@ async def monitor_socket(name, socket):
     """
     title = name
 
-    event = zmq.EVENT_DISCONNECTED | zmq.EVENT_CLOSED
-    monitor = socket.get_monitor_socket(event)
+    monitor = socket.get_monitor_socket(SOCKET_EVENT)
     data = await monitor.recv_multipart()
     monitor.disable_monitor()
     data = parse_monitor_message(data)
+    event = data['event']
 
     if __debug__:
-        logger.debug(
-            '{}: waiting for event {}, got {}'
-            .format(title, event, data['event'])
-        )
+        logger.debug('{}: received event {}' .format(title, event))
 
-    assert data['event'] & event == data['event']
+    assert event & SOCKET_EVENT == event
 
-    linger = 0 if data['event'] == zmq.EVENT_DISCONNECTED else -1
-    socket.close(linger)
-    if __debug__:
-        logger.debug('{}: socket closed with linger {}'.format(title, linger))
+    await wait_empty_socket(title, socket)
+
+    # no message, so close the socket immediately
+    socket.close(0)
     logger.info('{}: exit monitor'.format(title))
+
+async def wait_empty_socket(title, socket):
+    """
+    Wait for all the message to be received from socket.
+
+    There can be still messages to be received on our side, after other
+    side closed socket. Wait until our side receives all of them.
+    """
+    poller = Poller()
+    poller.register(socket)
+    logger.info('{}: wait for all messages to be received'.format(title))
+    while True:
+        data = await poller.poll(2)
+        if not data:
+            break
 
 async def send_messages(socket, messages):
     for msg in messages:
