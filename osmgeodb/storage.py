@@ -23,6 +23,7 @@ PostgreSQL storage for osmgeodb.
 The performance is achieved by
 
 - using unlogged tables
+- using `copy` instead of insert statements
 - without the need of changing the PostgreSQL configuration file and the
   server restart
 
