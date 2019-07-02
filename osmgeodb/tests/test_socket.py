@@ -19,7 +19,8 @@
 
 import asyncio
 
-from osmgeodb.socket import wait_empty_socket
+from osmgeodb.mpack import m_pack
+from osmgeodb.socket import wait_empty_socket, recv_messages
 
 import pytest
 from unittest import mock
@@ -37,5 +38,62 @@ async def test_wait_empty_socket():
 
         # `wait_empty_socket` exits on 2nd loop
         assert 2 == poller.poll.call_count
+
+@pytest.mark.asyncio
+async def test_recv_messages():
+    """
+    Test receiving 0MQ messages until socket is closed.
+    """
+    async def recv(v):
+        return v
+
+    socket = mock.MagicMock()
+    socket.recv.side_effect = [
+        recv(m_pack(['a', 'b'])),
+        recv(m_pack([1, 2])),
+        ValueError('shall not happen')
+    ]
+    socket.closed = False
+
+    items = recv_messages(socket)
+    result = await items.__anext__()
+    assert ['a', 'b'] == result
+
+    result = await items.__anext__()
+    assert [1, 2] == result
+
+    socket.closed = True
+    with pytest.raises(StopAsyncIteration):
+        await items.__anext__()
+
+@pytest.mark.asyncio
+async def test_recv_messages_cancel():
+    """
+    Test receiving 0MQ messages until socket is closed and `recv` call is
+    cancelled.
+    """
+    async def recv(v):
+        return v
+
+    socket = mock.MagicMock()
+    socket.recv.side_effect = [
+        recv(m_pack(['a', 'b'])),
+        recv(m_pack([1, 2])),
+        asyncio.CancelledError(),
+    ]
+    socket.closed = False
+
+    items = recv_messages(socket)
+    result = await items.__anext__()
+    assert ['a', 'b'] == result
+
+    result = await items.__anext__()
+    assert [1, 2] == result
+
+    with pytest.raises(StopAsyncIteration):
+        await items.__anext__()
+
+    # test post-condition
+    assert not socket.closed
 
 # vim: sw=4:et:ai

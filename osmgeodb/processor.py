@@ -21,20 +21,12 @@ import asyncio
 import zlib
 
 from .osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
-from .mpack import m_pack, m_unpack
 from .parser import parse_dense_nodes
 from .posindex import create_index_entry
+from .socket import recv_messages
 
 async def process_messages(socket, q_index, q_store):
-    while not socket.closed:
-        try:
-            data = await socket.recv()
-        except asyncio.CancelledError as ex:
-            # if socket.recv call is cancelled the socket is closed, so
-            # exit
-            break
-        file_pos, data = m_unpack(data)
-
+    async for file_pos, data in recv_messages(socket):
         data = zlib.decompress(data)
         block = PrimitiveBlock()
         block.ParseFromString(data)

@@ -24,7 +24,7 @@ import zmq
 from zmq.asyncio import Poller
 from zmq.utils.monitor import parse_monitor_message
 
-from .mpack import m_pack
+from .mpack import m_pack, m_unpack
 
 logger = logging.getLogger(__name__)
 
@@ -71,16 +71,26 @@ async def wait_empty_socket(title, socket):
         if not data:
             break
 
+async def recv_messages(socket):
+    """
+    Iterate over messages received from 0MQ socket.
+
+    The messages are received until socket is closed.
+
+    :param socket: 0MQ socket.
+    """
+    try:
+        while not socket.closed:
+            # no need to copy message data as it is immediately unpacked by
+            # msgpack
+            yield m_unpack(await socket.recv(copy=False))
+    except asyncio.CancelledError as ex:
+        # if socket.recv call is cancelled, the socket is closed,
+        # therefore exit gracefuly
+        pass
+
 async def send_messages(socket, messages):
     for msg in messages:
         await socket.send(m_pack(msg))
-
-async def exit_on_cancel(task):
-    try:
-        result = await task
-    except asyncio.CancelledError:
-        result = None
-
-    return result
 
 # vim: sw=4:et:ai

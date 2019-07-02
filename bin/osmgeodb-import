@@ -33,7 +33,7 @@ from zmq.asyncio import Context
 from osmgeodb.posindex import receive_pos_index, send_pos_index, create_pos_index
 from osmgeodb.reader import read_messages
 from osmgeodb.processor import process_messages
-from osmgeodb.socket import monitor_socket, send_messages, exit_on_cancel
+from osmgeodb.socket import monitor_socket, send_messages
 from osmgeodb.storage import store_data
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ def data_indexer():
     socket.bind('tcp://127.0.0.1:5558')
 
     pos_index = create_pos_index()
-    t1 = exit_on_cancel(receive_pos_index(socket, pos_index))
+    t1 = receive_pos_index(socket, pos_index)
     t2 = monitor_socket('indexer', socket)
 
     try:

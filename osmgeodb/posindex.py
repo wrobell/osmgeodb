@@ -26,8 +26,8 @@ import zmq.asyncio
 from collections import Counter
 from sortedcontainers import SortedKeyList
 
-from osmgeodb.mpack import m_pack, m_unpack
-from osmgeodb.parser import parse_tags
+from .mpack import m_pack
+from .socket import recv_messages
 
 DATA_COUNTER = Counter()
 
@@ -40,10 +40,8 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
     """
     ts = time.time()
     k = 0
-    while not socket.closed:
+    async for item in recv_messages(socket):
         k += 1
-        data = await socket.recv()
-        item = m_unpack(data)
         pos_index.add(item)
 
         DATA_COUNTER['nodes'] += 8000
