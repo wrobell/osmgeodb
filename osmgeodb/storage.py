@@ -17,6 +17,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+PostgreSQL storage for osmgeodb.
+
+The performance is achieved by
+
+- using unlogged tables
+- without the need of changing the PostgreSQL configuration file and the
+  server restart
+
+Based on
+
+    https://www.postgresql.org/docs/current/populate.html
+"""
+
 import asyncpg
 import shapely.geometry
 import shapely.wkb
@@ -27,6 +41,8 @@ async def store_data(dsn, queue):
 
     try:
         async with conn.transaction():
+            await conn.execute('set local synchronous_commit to off')
+            await conn.execute('set constraints all deferred')
             while True:
                 items = await queue.get()
                 if items is None:

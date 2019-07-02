@@ -26,7 +26,12 @@ create unlogged table osm_point (
     tags hstore,
     primary key (id)
 );
+
 select AddGeometryColumn('osm_point', 'location', 4326, 'POINT', 2);
+
+-- until parallel creation of gist and gin indexes possible, create the
+-- indexes upfront
+create index idx_osm_point on osm_point using gist (location);
 create index idx_osm_point_t on osm_point using gin (tags);
 
 END
