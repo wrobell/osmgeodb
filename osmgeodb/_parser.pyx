@@ -19,13 +19,24 @@
 # cython: language_level=3str
 #
 
-cdef set BLACKLIST = {'source', 'created_by'}
+cpdef list cumsum(data):
+    cdef Py_ssize_t i
+    cdef list result = data[:]
 
-def parse_tags(indexes, strings) -> list:
-    cdef size_t i = 0
+    for i in range(1, len(result)):
+        result[i] += result[i - 1]
+    return result
+
+def decode_coord(data, double granularity, double offset) -> list:
+    cdef double v
+    return [(v * granularity + offset) / 1e9 for v in data]
+
+def parse_tags(tags, indexes, strings) -> list:
+    cdef Py_ssize_t i = 0
     cdef list result = []
-    cdef size_t max_idx = len(indexes) - 1
+    cdef Py_ssize_t max_idx = len(indexes) - 1
     cdef dict current
+    cdef str key
 
     strings = [s.decode('utf-8') for s in strings]
 
@@ -33,9 +44,13 @@ def parse_tags(indexes, strings) -> list:
         current = {}
         while i < max_idx and indexes[i] != 0:
             assert i + 1 <= max_idx
-            current[strings[indexes[i]]] = strings[indexes[i + 1]]
+            key = strings[indexes[i]]
+            if key in tags:
+                current[key] = strings[indexes[i + 1]]
             i += 2
-        result.append({} if BLACKLIST.issuperset(current) else current)
+        result.append(current)
         i += 1
 
     return result
+
+# vim: sw=4:et:ai

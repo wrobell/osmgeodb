@@ -17,28 +17,100 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import cytoolz.itertoolz as itz
-import numpy as np
-
-from itertools import takewhile
 from shapely.geometry import Point
 
-from ._parser import parse_tags
+from ._parser import parse_tags, cumsum, decode_coord
+
+# list of tags copied from osm2pgsql project default style
+TAGS = {
+    'access',
+    'addr:housename',
+    'addr:housenumber',
+    'addr:interpolation',
+    'admin_level',
+    'aerialway',
+    'aeroway',
+    'amenity',
+    'area',
+    'barrier',
+    'bicycle',
+    'brand',
+    'bridge',
+    'boundary',
+    'building',
+    'capital',
+    'construction',
+    'covered',
+    'culvert',
+    'cutting',
+    'denomination',
+    'disused',
+    'ele',
+    'embankment',
+    'foot',
+    'generator:source',
+    'harbour',
+    'highway',
+    'historic',
+    'horse',
+    'intermittent',
+    'junction',
+    'landuse',
+    'layer',
+    'leisure',
+    'lock',
+    'man_made',
+    'military',
+    'motorcar',
+    'name',
+    'natural',
+    'office',
+    'oneway',
+    'operator',
+    'place',
+    'population',
+    'power',
+    'power_source',
+    'public_transport',
+    'railway',
+    'ref',
+    'religion',
+    'route',
+    'service',
+    'shop',
+    'sport',
+    'surface',
+    'toll',
+    'tourism',
+    'tower:type',
+    'tracktype',
+    'tunnel',
+    'water',
+    'waterway',
+    'wetland',
+    'width',
+    'wood',
+    'z_order',
+    'way_area',
+    'abandoned:aeroway',
+    'abandoned:amenity',
+    'abandoned:building',
+    'abandoned:landuse',
+    'abandoned:power',
+    'area:highway',
+}
+
 
 def parse_dense_nodes(block, data):
     granularity = block.granularity
     lon_offset = block.lon_offset
     lat_offset = block.lat_offset
 
-    ids = np.array(data.id, dtype=np.int64).cumsum()
+    ids = cumsum(data.id)
+    lons = decode_coord(data.lon, granularity, lon_offset)
+    lats = decode_coord(data.lat, granularity, lat_offset)
 
-    lons = np.array(data.lon, dtype=np.float64).cumsum()
-    lons = (lons * granularity + lon_offset) / 1e9
-
-    lats = np.array(data.lat, dtype=np.float64).cumsum()
-    lats = (lats * granularity + lat_offset) / 1e9
-
-    tags = parse_tags(data.keys_vals, block.stringtable.s)
+    tags = parse_tags(TAGS, data.keys_vals, block.stringtable.s)
 
     items = zip(ids, lons, lats, tags)
 
