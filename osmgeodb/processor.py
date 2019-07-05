@@ -39,37 +39,31 @@ async def process_messages(socket, q_index, q_store):
         counter['parse blocks'] = time.monotonic() - ts
 
         counter['parse groups'] = 0
-        for type, group in detect_block_groups(block):
-            f = PARSERS.get(type)
-            if f:
-                ts = time.monotonic()
-                data = f(block, group)
-                counter['parse groups'] += time.monotonic() - ts
-                await q_index.put(create_index_entry(type, file_pos, group, counter))
-                await q_store.put(data)
+        type, group, f = detect_block_group(block)
+        if f:
+            ts = time.monotonic()
+            data = f(block, group)
+            counter['parse groups'] += time.monotonic() - ts
+            await q_index.put(create_index_entry(type, file_pos, group, counter))
+            await q_store.put(data)
 
     await q_index.put(None)
     await q_store.put(None)
 
-def detect_group(group):
+def detect_block_group(block):
+    assert len(block.primitivegroup) == 1, len(block.primitivegroup)
+
+    group = block.primitivegroup[0]
     if len(group.dense.id):
-        result = 'dense_nodes', group.dense
+        result = 'dense_nodes', group.dense, parse_dense_nodes
     elif group.nodes:
-        result = 'nodes', group.nodes
+        result = 'nodes', group.nodes, None
     elif group.ways:
-        result = 'ways', group.ways
+        result = 'ways', group.ways, None
     else:
         assert group.relations
-        result = 'relations', group.relations
+        result = 'relations', group.relations, None
 
     return result
-
-def detect_block_groups(block):
-    items = (detect_group(g) for g in block.primitivegroup)
-    yield from items
-
-PARSERS = {
-    'dense_nodes': parse_dense_nodes,
-}
 
 # vim: sw=4:et:ai
