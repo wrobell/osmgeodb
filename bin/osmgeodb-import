@@ -102,8 +102,7 @@ def osm_processor(dsn):
         t3 = store_data(dsn, q_store)
         loop.run_until_complete(asyncio.gather(t1, t2, t3))
 
-        # force exit of indexer with small linger value
-        s_index.close(100)
+        s_index.close()
     except:
         socket.close(0)
         s_index.close(0)

@@ -18,6 +18,7 @@
 #
 
 import asyncio
+import logging
 import operator
 import time
 import zmq
@@ -29,6 +30,8 @@ from sortedcontainers import SortedKeyList
 from .mpack import m_pack
 from .socket import recv_messages
 
+logger = logging.getLogger()
+
 DATA_COUNTER = Counter()
 
 async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
@@ -38,7 +41,7 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
     :param socket: ZMQ socket.
     :param pos_index: OSM position index.
     """
-    ts = time.time()
+    ts = time.monotonic()
     k = 0
     async for item in recv_messages(socket):
         k += 1
@@ -46,9 +49,19 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
 
         DATA_COUNTER['nodes'] += 8000
         if k % 1000 == 0:
-            td = time.time() - ts
+            td = time.monotonic() - ts
             count = DATA_COUNTER['nodes'] / 1e6
-            print('nodes[m]: {:,.1f} {:.3f}/s,  index len={}'.format(count, count / td, len(pos_index)))
+            logger.info(
+                'nodes[m]: {:,.3f} {:.3f}/s,  index len={}'
+                .format(count, count / td, len(pos_index))
+            )
+
+    td = time.monotonic() - ts
+    count = DATA_COUNTER['nodes'] / 1e6
+    logger.info(
+        'nodes[m]: {:,.3f} {:.3f}/s,  index len={}'
+        .format(count, count / td, len(pos_index))
+    )
 
 async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
     while not socket.closed:
