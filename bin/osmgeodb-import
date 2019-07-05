@@ -102,7 +102,7 @@ def osm_processor(dsn):
         t3 = store_data(dsn, q_store)
         loop.run_until_complete(asyncio.gather(t1, t2, t3))
 
-        s_index.close()
+        s_index.close(0)
     except:
         socket.close(0)
         s_index.close(0)

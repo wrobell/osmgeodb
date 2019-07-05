@@ -27,7 +27,7 @@ import zmq
 from functools import partial
 from zmq.asyncio import Context
 
-from osmgeodb.osm_pb2 import BlobHeader, Blob, HeaderBlock
+from osmgeodb.osm_proto import BlobHeader, Blob, HeaderBlock
 from osmgeodb.mpack import m_pack
 
 def read_data(f):

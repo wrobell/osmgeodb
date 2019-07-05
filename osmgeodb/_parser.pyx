@@ -21,7 +21,7 @@
 
 cpdef list cumsum(data):
     cdef Py_ssize_t i
-    cdef list result = data[:]
+    cdef list result = list(data)
 
     for i in range(1, len(result)):
         result[i] += result[i - 1]
@@ -29,7 +29,7 @@ cpdef list cumsum(data):
 
 def decode_coord(data, double granularity, double offset) -> list:
     cdef double v
-    return [(v * granularity + offset) / 1e9 for v in data]
+    return [(v * granularity + offset) / 1e9 for v in cumsum(data)]
 
 def parse_tags(tags, indexes, strings) -> list:
     cdef Py_ssize_t i = 0

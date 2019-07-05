@@ -45,11 +45,12 @@ setup(
         'Code': 'https://github.com/wrobell/osmgeodb',
         'Issue tracker': 'https://github.com/wrobell/osmgeodb/issues',
     },
-    setup_requires = ['setuptools_git >= 1.0',],
+    setup_requires = ['setuptools_git >= 1.0', 'pyrobuf'],
     install_requires=[
         'cytoolz >= 0.8.2',
         'setproctitle',
         'sortedcontainers',
+        'pyrobuf',
     ],
     classifiers=[
         'Topic :: Software Development :: Libraries',
@@ -58,7 +59,11 @@ setup(
         'Development Status :: 4 - Beta',
     ],
     ext_modules=cythonize([
-        Extension('osmgeodb._parser', ['osmgeodb/_parser.pyx'])
+        Extension('osmgeodb._parser', ['osmgeodb/_parser.pyx']),
+        # until the following bug fixed:
+        #
+        #     https://github.com/appnexus/pyrobuf/issues/132
+        Extension('osmgeodb.osm_proto', ['osmgeodb/osm_proto.pyx']),
     ]),
     license='GPLv3+',
 )

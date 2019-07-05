@@ -20,7 +20,7 @@
 import asyncio
 import zlib
 
-from .osm_pb2 import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
+from .osm_proto import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
 from .parser import parse_dense_nodes
 from .posindex import create_index_entry
 from .socket import recv_messages
