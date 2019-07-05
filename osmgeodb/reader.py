@@ -39,10 +39,8 @@ def read_data(f):
         assert len(size_raw) == 4
         size = struct.unpack('!L', size_raw)[0]
 
-        header = BlobHeader()
-        header.ParseFromString(f.read(size))
-        msg = Blob()
-        msg.ParseFromString(f.read(header.datasize))
+        header = BlobHeader.FromString(f.read(size))
+        msg = Blob.FromString(f.read(header.datasize))
 
         result = pos, msg.zlib_data
 
@@ -50,8 +48,7 @@ def read_data(f):
 
 def read_messages(f):
     pos, data = read_data(f)
-    header = HeaderBlock()
-    header.ParseFromString(zlib.decompress(data))
+    header = HeaderBlock.FromString(zlib.decompress(data))
     assert 'OsmSchema-V0.6' in header.required_features
     assert 'DenseNodes' in header.required_features
 

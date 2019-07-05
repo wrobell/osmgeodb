@@ -32,7 +32,10 @@ from .socket import recv_messages
 
 logger = logging.getLogger()
 
-DATA_COUNTER = Counter()
+FMT_STATS = 'nodes[m]: {0:,.3f} {1:.3f}/s, time[s]:' \
+    ' decompression: {2[decompression]:.1f}' \
+    ' block parse: {2[parse blocks]:.1f}' \
+    ' group parse: {2[parse groups]:.1f}'.format
 
 async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
     """
@@ -43,25 +46,21 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
     """
     ts = time.monotonic()
     k = 0
+    stats = Counter()
     async for item in recv_messages(socket):
         k += 1
-        pos_index.add(item)
+        pos_index.add(item[:-1])
+        stats += item[-1]
 
-        DATA_COUNTER['nodes'] += 8000
+        stats['nodes'] += 8000
         if k % 1000 == 0:
             td = time.monotonic() - ts
-            count = DATA_COUNTER['nodes'] / 1e6
-            logger.info(
-                'nodes[m]: {:,.3f} {:.3f}/s,  index len={}'
-                .format(count, count / td, len(pos_index))
-            )
+            count = stats['nodes'] / 1e6
+            logger.info(FMT_STATS(count, count / td, stats))
 
     td = time.monotonic() - ts
-    count = DATA_COUNTER['nodes'] / 1e6
-    logger.info(
-        'nodes[m]: {:,.3f} {:.3f}/s,  index len={}'
-        .format(count, count / td, len(pos_index))
-    )
+    count = stats['nodes'] / 1e6
+    logger.info(FMT_STATS(count, count / td, stats))
 
 async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
     while not socket.closed:
@@ -71,8 +70,8 @@ async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
 
         await socket.send(m_pack(item))
 
-def create_index_entry(type, file_pos, group):
-    return type, file_pos, group.id[0]
+def create_index_entry(type, file_pos, group, stats):
+    return type, file_pos, group.id[0], stats
 
 def create_pos_index() -> SortedKeyList:
     """

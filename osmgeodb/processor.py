@@ -18,24 +18,34 @@
 #
 
 import asyncio
+import time
 import zlib
+from collections import Counter
 
-from .osm_proto import BlobHeader, Blob, HeaderBlock, PrimitiveBlock
+from .osm_proto import PrimitiveBlock
 from .parser import parse_dense_nodes
 from .posindex import create_index_entry
 from .socket import recv_messages
 
 async def process_messages(socket, q_index, q_store):
+    counter = Counter()
     async for file_pos, data in recv_messages(socket):
+        ts = time.monotonic()
         data = zlib.decompress(data)
-        block = PrimitiveBlock()
-        block.ParseFromString(data)
+        counter['decompression'] = time.monotonic() - ts
 
+        ts = time.monotonic()
+        block = PrimitiveBlock.FromString(data)
+        counter['parse blocks'] = time.monotonic() - ts
+
+        counter['parse groups'] = 0
         for type, group in detect_block_groups(block):
             f = PARSERS.get(type)
             if f:
+                ts = time.monotonic()
                 data = f(block, group)
-                await q_index.put(create_index_entry(type, file_pos, group))
+                counter['parse groups'] += time.monotonic() - ts
+                await q_index.put(create_index_entry(type, file_pos, group, counter))
                 await q_store.put(data)
 
     await q_index.put(None)
