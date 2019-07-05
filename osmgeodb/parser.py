@@ -23,6 +23,11 @@ from ._parser import parse_tags, cumsum, decode_coord
 
 # list of tags copied from osm2pgsql project default style
 TAGS = {
+    'abandoned:aeroway',
+    'abandoned:amenity',
+    'abandoned:building',
+    'abandoned:landuse',
+    'abandoned:power',
     'access',
     'addr:housename',
     'addr:housenumber',
@@ -32,11 +37,12 @@ TAGS = {
     'aeroway',
     'amenity',
     'area',
+    'area:highway',
     'barrier',
     'bicycle',
+    'boundary',
     'brand',
     'bridge',
-    'boundary',
     'building',
     'capital',
     'construction',
@@ -87,17 +93,11 @@ TAGS = {
     'tunnel',
     'water',
     'waterway',
+    'way_area',
     'wetland',
     'width',
     'wood',
     'z_order',
-    'way_area',
-    'abandoned:aeroway',
-    'abandoned:amenity',
-    'abandoned:building',
-    'abandoned:landuse',
-    'abandoned:power',
-    'area:highway',
 }
 
 
