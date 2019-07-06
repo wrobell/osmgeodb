@@ -84,10 +84,10 @@ def osm_processor(dsn):
     loop = get_loop()
 
     ctx = zmq.asyncio.Context()
+
     socket = ctx.socket(zmq.PULL)
     socket.connect('tcp://127.0.0.1:5557')
 
-    ctx = zmq.asyncio.Context()
     s_index = ctx.socket(zmq.PUSH)
     s_index.connect('tcp://127.0.0.1:5558')
 
@@ -102,7 +102,7 @@ def osm_processor(dsn):
         t3 = store_data(dsn, q_store)
         loop.run_until_complete(asyncio.gather(t1, t2, t3))
 
-        s_index.close(0)
+        s_index.close()
     except:
         socket.close(0)
         s_index.close(0)
