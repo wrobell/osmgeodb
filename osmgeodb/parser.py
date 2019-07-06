@@ -17,8 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from shapely.geometry import Point
-
 from ._parser import parse_tags, cumsum, decode_coord
 
 # list of tags copied from osm2pgsql project default style
@@ -115,6 +113,6 @@ def parse_dense_nodes(block, data):
     items = zip(ids, lons, lats, tags)
 
     # store those positions, which have tags
-    return [(id, Point(lon, lat), meta) for id, lon, lat, meta in items if meta]
+    return [(id, (lon, lat), meta) for id, lon, lat, meta in items if meta]
 
 # vim: sw=4:et:ai
