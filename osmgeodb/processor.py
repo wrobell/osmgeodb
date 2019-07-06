@@ -18,6 +18,7 @@
 #
 
 import asyncio
+import logging
 import time
 import zlib
 from collections import Counter
@@ -26,6 +27,8 @@ from .osm_proto import PrimitiveBlock
 from .parser import parse_dense_nodes
 from .posindex import create_index_entry
 from .socket import recv_messages
+
+logger = logging.getLogger(__name__)
 
 async def process_messages(socket, q_index, q_store):
     counter = Counter()
@@ -39,31 +42,30 @@ async def process_messages(socket, q_index, q_store):
         counter['parse blocks'] = time.monotonic() - ts
 
         counter['parse groups'] = 0
-        type, group, f = detect_block_group(block)
-        if f:
+        counter['size'] = 0
+        items = (item for item in detect_block_groups(block) if item)
+        for type, group, size, f in items:
             ts = time.monotonic()
             data = f(block, group)
             counter['parse groups'] += time.monotonic() - ts
+            counter['size'] += size
             await q_index.put(create_index_entry(type, file_pos, group, counter))
             await q_store.put(data)
 
     await q_index.put(None)
     await q_store.put(None)
 
-def detect_block_group(block):
-    assert len(block.primitivegroup) == 1, len(block.primitivegroup)
-
-    group = block.primitivegroup[0]
+def detect_group(group):
     if len(group.dense.id):
-        result = 'dense_nodes', group.dense, parse_dense_nodes
-    elif group.nodes:
-        result = 'nodes', group.nodes, None
-    elif group.ways:
-        result = 'ways', group.ways, None
+        result = 'dense_nodes', group.dense, len(group.dense.id), parse_dense_nodes
     else:
-        assert group.relations
-        result = 'relations', group.relations, None
+        result = None
 
     return result
+
+def detect_block_groups(block):
+    items = (detect_group(g) for g in block.primitivegroup)
+    yield from items
+
 
 # vim: sw=4:et:ai

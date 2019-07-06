@@ -30,7 +30,7 @@ from sortedcontainers import SortedKeyList
 from .mpack import m_pack
 from .socket import recv_messages
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 FMT_STATS = 'nodes[m]: {0:,.3f} {1:.3f}/s, time[s]:' \
     ' decompression: {2[decompression]:.1f}' \
@@ -52,14 +52,13 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
         pos_index.add(item[:-1])
         stats += item[-1]
 
-        stats['nodes'] += 8000
         if k % 1000 == 0:
             td = time.monotonic() - ts
-            count = stats['nodes'] / 1e6
+            count = stats['size'] / 1e6
             logger.info(FMT_STATS(count, count / td, stats))
 
     td = time.monotonic() - ts
-    count = stats['nodes'] / 1e6
+    count = stats['size'] / 1e6
     logger.info(FMT_STATS(count, count / td, stats))
 
 async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
