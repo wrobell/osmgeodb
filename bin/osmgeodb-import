@@ -38,6 +38,8 @@ from osmgeodb.storage import store_data
 
 logger = logging.getLogger(__name__)
 
+HWM = 8
+
 def get_loop():
     """
     Install uvloop and return asyncio event loop.
@@ -57,6 +59,7 @@ def osm_reader(fn):
 
     ctx = zmq.asyncio.Context()
     socket = ctx.socket(zmq.PUSH)
+    socket.set_hwm(HWM)
     socket.bind('tcp://127.0.0.1:5557')
 
     with open(fn, 'rb') as f:
@@ -86,13 +89,14 @@ def osm_processor(dsn):
     ctx = zmq.asyncio.Context()
 
     socket = ctx.socket(zmq.PULL)
+    socket.set_hwm(HWM)
     socket.connect('tcp://127.0.0.1:5557')
 
     s_index = ctx.socket(zmq.PUSH)
     s_index.connect('tcp://127.0.0.1:5558')
 
-    q_index = asyncio.Queue(64)
-    q_store = asyncio.Queue(64)
+    q_index = asyncio.Queue(HWM)
+    q_store = asyncio.Queue(HWM)
 
     try:
         loop.create_task(monitor_socket('processor', socket))

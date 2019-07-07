@@ -52,7 +52,7 @@ async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
         pos_index.add(item[:-1])
         stats += item[-1]
 
-        if k % 1000 == 0:
+        if k % 100 == 0:
             td = time.monotonic() - ts
             count = stats['size'] / 1e6
             logger.info(FMT_STATS(count, count / td, stats))

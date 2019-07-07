@@ -21,7 +21,6 @@ import asyncio
 import logging
 import time
 import zlib
-from collections import Counter
 
 from .osm_proto import PrimitiveBlock
 from .parser import parse_dense_nodes
@@ -31,26 +30,27 @@ from .socket import recv_messages
 logger = logging.getLogger(__name__)
 
 async def process_messages(socket, q_index, q_store):
-    counter = Counter()
     async for file_pos, data in recv_messages(socket):
+        stats = {}
         ts = time.monotonic()
         data = zlib.decompress(data)
-        counter['decompression'] = time.monotonic() - ts
+        stats['decompression'] = time.monotonic() - ts
 
         ts = time.monotonic()
         block = PrimitiveBlock.FromString(data)
-        counter['parse blocks'] = time.monotonic() - ts
+        stats['parse blocks'] = time.monotonic() - ts
 
-        counter['parse groups'] = 0
-        counter['size'] = 0
-        items = (item for item in detect_block_groups(block) if item)
+        stats['parse groups'] = 0
+        stats['size'] = 0
+        items = (item for item in block_groups(block) if item)
         for type, group, size, f in items:
             ts = time.monotonic()
             data = f(block, group)
-            counter['parse groups'] += time.monotonic() - ts
-            counter['size'] += size
-            await q_index.put(create_index_entry(type, file_pos, group, counter))
+            stats['parse groups'] += time.monotonic() - ts
+            stats['size'] += size
             await q_store.put(data)
+
+        await q_index.put(create_index_entry(type, file_pos, group, stats))
 
     await q_index.put(None)
     await q_store.put(None)
@@ -63,7 +63,7 @@ def detect_group(group):
 
     return result
 
-def detect_block_groups(block):
+def block_groups(block):
     items = (detect_group(g) for g in block.primitivegroup)
     yield from items
 
