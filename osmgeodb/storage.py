@@ -34,12 +34,7 @@ Based on
 
 import asyncpg
 
-import binascii
-import struct
-
-FMT_POINT = struct.Struct('<dd').pack
-# ewkb, little endian, point, srid 4326
-PREFIX_POINT = binascii.unhexlify('0101000020E6100000')
+from .ewkb import to_ewkb
 
 async def store_data(dsn, queue):
     conn = await asyncpg.connect(dsn)
@@ -75,7 +70,7 @@ async def setup_types(conn):
     )
 
 def encode_geometry(geometry):
-    return PREFIX_POINT + FMT_POINT(*geometry)
+    return to_ewkb(*geometry)
 
 def decode_geometry(wkb):
     return shapely.wkb.loads(wkb)
