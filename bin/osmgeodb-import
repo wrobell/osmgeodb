@@ -35,6 +35,7 @@ from osmgeodb.reader import read_messages
 from osmgeodb.processor import process_messages
 from osmgeodb.socket import monitor_socket, send_messages
 from osmgeodb.storage import store_data
+from osmgeodb.stats import receive_stats, send_stats
 
 logger = logging.getLogger(__name__)
 
@@ -95,21 +96,28 @@ def osm_processor(dsn):
     s_index = ctx.socket(zmq.PUSH)
     s_index.connect('tcp://127.0.0.1:5558')
 
+    s_stats = ctx.socket(zmq.PUSH)
+    s_stats.connect('tcp://127.0.0.1:5559')
+
     q_index = asyncio.Queue(HWM)
     q_store = asyncio.Queue(HWM)
+    q_stats = asyncio.Queue(HWM)
 
     try:
         loop.create_task(monitor_socket('processor', socket))
 
-        t1 = process_messages(socket, q_index, q_store)
+        t1 = process_messages(socket, q_index, q_store, q_stats)
         t2 = send_pos_index(s_index, q_index)
         t3 = store_data(dsn, q_store)
-        loop.run_until_complete(asyncio.gather(t1, t2, t3))
+        t4 = send_stats(s_stats, q_stats)
+        loop.run_until_complete(asyncio.gather(t1, t2, t3, t4))
 
         s_index.close()
+        s_stats.close()
     except:
         socket.close(0)
         s_index.close(0)
+        s_stats.close(0)
         raise
     finally:
         logger.info('processor exit')
@@ -134,6 +142,26 @@ def data_indexer():
     finally:
         logger.info('data indexer exit')
 
+def stats_collector():
+    """
+    Create index of OSM nodes and OSM ways.
+    """
+    setproctitle.setproctitle('osmgeodb: stats')
+    loop = get_loop()
+
+    ctx = zmq.asyncio.Context()
+    socket = ctx.socket(zmq.PULL)
+    socket.bind('tcp://127.0.0.1:5559')
+
+    pos_index = create_pos_index()
+    t1 = receive_stats(socket)
+    t2 = monitor_socket('stats', socket)
+
+    try:
+        loop.run_until_complete(asyncio.gather(t1, t2))
+    finally:
+        logger.info('data indexer exit')
+
 
 parser = argparse.ArgumentParser(description='osmgeodb')
 parser.add_argument('input', help='OSM data file')
@@ -145,10 +173,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 n_cpu = cpu_count()
 # add low churn reader and indexer processes
-with ProcessPoolExecutor(n_cpu + 2) as pool:
+with ProcessPoolExecutor(n_cpu + 3) as pool:
     tasks = [
         partial(osm_reader, args.input),
         data_indexer,
+        stats_collector,
     ]
     f = partial(osm_processor, args.dsn)
     tasks.extend([f] * n_cpu)

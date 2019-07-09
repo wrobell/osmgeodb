@@ -25,7 +25,6 @@ import zmq
 import zmq.asyncio
 
 from collections import Counter
-from sortedcontainers import SortedKeyList
 
 from .mpack import m_pack
 from .socket import recv_messages
@@ -37,17 +36,22 @@ FMT_STATS = 'nodes[m]: {0:,.3f} {1:.3f}/s, time[s]:' \
     ' block parse: {2[parse blocks]:.1f}' \
     ' group parse: {2[parse groups]:.1f}'.format
 
-async def receive_pos_index(socket: zmq.Socket, pos_index: SortedKeyList):
+async def receive_stats(socket: zmq.Socket):
     """
     Receive OSM position index item from ZMQ socket and update the index.
 
     :param socket: ZMQ socket.
     :param pos_index: OSM position index.
     """
-    async for item in recv_messages(socket):
-        pos_index.add(item)
+    stats = Counter()
+    show_task = asyncio.create_task(show_stats(stats))
 
-async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
+    async for item in recv_messages(socket):
+        stats += item
+
+    show_task.cancel()
+
+async def send_stats(socket: zmq.Socket, queue: asyncio.Queue):
     while not socket.closed:
         item = await queue.get()
         if item is None:
@@ -55,15 +59,19 @@ async def send_pos_index(socket: zmq.Socket, queue: asyncio.Queue):
 
         await socket.send(m_pack(item))
 
-def create_index_entry(type, file_pos, group):
-    return type, file_pos, group.id[0]
+async def show_stats(stats: Counter):
+    ts = time.monotonic()
+    try:
+        while True:
+            await asyncio.sleep(60)
 
-def create_pos_index() -> SortedKeyList:
-    """
-    Create OSM position index.
+            td = time.monotonic() - ts
+            count = stats['size'] / 1e6
+            logger.info(FMT_STATS(count, count / td, stats))
 
-    The new index is empty.
-    """
-    return SortedKeyList([], key=operator.itemgetter(2))
+    finally:
+        td = time.monotonic() - ts
+        count = stats['size'] / 1e6
+        logger.info(FMT_STATS(count, count / td, stats))
 
 # vim: sw=4:et:ai

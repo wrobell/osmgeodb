@@ -29,7 +29,7 @@ from .socket import recv_messages
 
 logger = logging.getLogger(__name__)
 
-async def process_messages(socket, q_index, q_store):
+async def process_messages(socket, q_index, q_store, q_stats):
     async for file_pos, data in recv_messages(socket):
         stats = {}
         ts = time.monotonic()
@@ -40,20 +40,23 @@ async def process_messages(socket, q_index, q_store):
         block = PrimitiveBlock.FromString(data)
         stats['parse blocks'] = time.monotonic() - ts
 
-        stats['parse groups'] = 0
-        stats['size'] = 0
         items = (item for item in block_groups(block) if item)
-        for type, group, size, f in items:
-            ts = time.monotonic()
-            data = f(block, group)
-            stats['parse groups'] += time.monotonic() - ts
-            stats['size'] += size
-            await q_store.put(data)
+        ts = time.monotonic()
+        items = [(t, g, s, f(block, g)) for t, g, s, f in items]
+        stats['parse groups'] = time.monotonic() - ts
+        if not items:
+            continue
 
-        await q_index.put(create_index_entry(type, file_pos, group, stats))
+        types, groups, sizes, data = zip(*items)
+        stats['size'] = sum(sizes)
+
+        await q_store.put((v for item in data for v in item))
+        await q_index.put(create_index_entry(types[0], file_pos, groups[0]))
+        await q_stats.put(stats)
 
     await q_index.put(None)
     await q_store.put(None)
+    await q_stats.put(None)
 
 def detect_group(group):
     if len(group.dense.id):
