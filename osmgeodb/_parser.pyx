@@ -19,22 +19,24 @@
 # cython: language_level=3str
 #
 
-cpdef list cumsum(data):
-    cdef Py_ssize_t i
-    cdef list result = list(data)
 
-    for i in range(1, len(result)):
-        result[i] += result[i - 1]
-    return result
+cimport pyrobuf_list
 
-def decode_coord(data, double granularity, double offset) -> list:
-    cdef double v
+cpdef pyrobuf_list.Int64List cumsum(data: pyrobuf_list.Int64List):
+    cdef size_t i
+
+    for i in range(1, data._n_items):
+        data._data[i] += data._data[i - 1]
+    return data
+
+def decode_coord(pyrobuf_list.Int64List data, double granularity, double offset) -> list:
+    cdef long v
     return [(v * granularity + offset) / 1e9 for v in cumsum(data)]
 
-def parse_tags(tags, indexes, strings) -> list:
-    cdef Py_ssize_t i = 0
+def parse_tags(tags, pyrobuf_list.Int32List indexes, strings) -> list:
+    cdef size_t i = 0
     cdef list result = []
-    cdef Py_ssize_t max_idx = len(indexes) - 1
+    cdef size_t max_idx = indexes._n_items
     cdef dict current
     cdef str key
 
@@ -42,11 +44,11 @@ def parse_tags(tags, indexes, strings) -> list:
 
     while i <= max_idx:
         current = {}
-        while i < max_idx and indexes[i] != 0:
+        while i < max_idx and indexes._data[i] != 0:
             assert i + 1 <= max_idx
-            key = strings[indexes[i]]
+            key = strings[indexes._data[i]]
             if key in tags:
-                current[key] = strings[indexes[i + 1]]
+                current[key] = strings[indexes._data[i + 1]]
             i += 2
         result.append(current)
         i += 1
