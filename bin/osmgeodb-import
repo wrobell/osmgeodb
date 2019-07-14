@@ -160,7 +160,7 @@ def stats_collector():
     try:
         loop.run_until_complete(asyncio.gather(t1, t2))
     finally:
-        logger.info('data indexer exit')
+        logger.info('stats collector exit')
 
 
 parser = argparse.ArgumentParser(description='osmgeodb')
