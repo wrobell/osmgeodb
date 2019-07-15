@@ -1,5 +1,6 @@
 -r requirements.txt
 
+asynctest
 mypy
 pytest-cov>=2.6.0
 pytest-timeout
