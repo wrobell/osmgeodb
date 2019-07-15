@@ -43,7 +43,7 @@ async def receive_stats(socket: zmq.Socket):
     :param socket: ZMQ socket.
     :param pos_index: OSM position index.
     """
-    stats = Counter()
+    stats: Counter = Counter()
     show_task = asyncio.create_task(show_stats(stats))
 
     async for item in recv_messages(socket):
