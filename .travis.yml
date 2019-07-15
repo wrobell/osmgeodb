@@ -9,5 +9,6 @@ install:
   - pyrobuf proto/osm.proto --out-dir osmgeodb
 
 script:
+  - python setup.py build_ext --inplace
   - mypy osmgeodb
   - pytest -vv
