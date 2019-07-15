@@ -52,6 +52,7 @@ setup(
         'pyrobuf >= 0.9.0',
         'setproctitle',
         'sortedcontainers',
+        'zmq',
     ],
     classifiers=[
         'Topic :: Software Development :: Libraries',
