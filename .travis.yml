@@ -6,6 +6,7 @@ python:
 
 install:
   - pip install -r requirements-test.txt
+  - pyrobuf proto/osm.proto --out-dir osmgeodb
 
 script:
   - mypy osmgeodb

@@ -49,6 +49,7 @@ setup(
     install_requires=[
         'asyncpg',
         'cytoolz >= 0.8.2',
+        'msgpack',
         'pyrobuf >= 0.9.0',
         'setproctitle',
         'sortedcontainers',
