@@ -21,25 +21,29 @@
 Unit tests for OSM data parsing.
 """
 
+from pyrobuf_list import Int32List, Int64List
+
 from osmgeodb.parser import parse_tags, cumsum
 
 def test_parse_node_tags():
     """
     Test parsing node tags.
     """
-    indexes = [0, 2, 3, 4, 5, 0, 0, 2, 5, 0, 0]
+    indexes = Int32List()
+    indexes.extend([0, 2, 3, 4, 5, 0, 0, 2, 5, 0, 0])
     strings = [b'', b'', b'b1', b'b2', b'b3', b'b4']
     allowed = {'b1', 'b3'}
     tags = parse_tags(allowed, indexes, strings)
 
-    expected = [{}, {'b1': 'b2', 'b3': 'b4'}, {}, {'b1': 'b4'}, {}]
+    expected = [{}, {'b1': 'b2', 'b3': 'b4'}, {}, {'b1': 'b4'}, {}, {}]
     assert expected == list(tags)
 
 def test_parse_node_tags_with_disallowed():
     """
     Test parsing node tags when disallowed tags are dropped.
     """
-    indexes = [2, 3, 4, 5, 6, 7, 0, 4, 5, 0, 4, 5, 6, 7]
+    indexes = Int32List()
+    indexes.extend([2, 3, 4, 5, 6, 7, 0, 4, 5, 0, 4, 5, 6, 7])
     strings = [b'', b'', b'k1', b'v1', b'k2', b'v2', b'k3', b'v3']
     allowed = {'k1', 'k3'}
     tags = parse_tags(allowed, indexes, strings)
@@ -55,7 +59,9 @@ def test_cumsum():
     """
     Test cumulative sum.
     """
-    result = cumsum(list(range(4)))
+    data = Int64List()
+    data.extend(range(4))
+    result = cumsum(data)
     assert [0, 1, 3, 6] == result
 
 # vim: sw=4:et:ai
