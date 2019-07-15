@@ -31,15 +31,16 @@ from functools import partial
 from zmq.asyncio import Context
 
 from osmgeodb.posindex import receive_pos_index, send_pos_index, create_pos_index
-from osmgeodb.reader import read_messages
 from osmgeodb.processor import process_messages
+from osmgeodb.reader import read_messages
+from osmgeodb.sbuff import SynchronizedBuffer
 from osmgeodb.socket import monitor_socket, send_messages
-from osmgeodb.storage import store_data
 from osmgeodb.stats import receive_stats, send_stats
+from osmgeodb.storage import store_data
 
 logger = logging.getLogger(__name__)
 
-HWM = 8
+HWM = 16
 
 def get_loop():
     """
@@ -99,18 +100,14 @@ def osm_processor(dsn):
     s_stats = ctx.socket(zmq.PUSH)
     s_stats.connect('tcp://127.0.0.1:5559')
 
-    q_index = asyncio.Queue(HWM)
-    q_store = asyncio.Queue(HWM)
-    q_stats = asyncio.Queue(HWM)
-
     try:
         loop.create_task(monitor_socket('processor', socket))
 
-        t1 = process_messages(socket, q_index, q_store, q_stats)
-        t2 = send_pos_index(s_index, q_index)
-        t3 = store_data(dsn, q_store)
-        t4 = send_stats(s_stats, q_stats)
-        loop.run_until_complete(asyncio.gather(t1, t2, t3, t4))
+        buff = SynchronizedBuffer(10000)
+
+        t1 = process_messages(socket, buff, s_index, s_stats)
+        t2 = store_data(dsn, buff)
+        loop.run_until_complete(asyncio.gather(t1, t2))
 
         s_index.close()
         s_stats.close()

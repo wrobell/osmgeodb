@@ -26,10 +26,11 @@ from .osm_proto import PrimitiveBlock
 from .parser import parse_dense_nodes
 from .posindex import create_index_entry
 from .socket import recv_messages
+from .mpack import m_pack
 
 logger = logging.getLogger(__name__)
 
-async def process_messages(socket, q_index, q_store, q_stats):
+async def process_messages(socket, buff, s_index, s_stats):
     async for file_pos, data in recv_messages(socket):
         stats = {}
         ts = time.monotonic()
@@ -50,13 +51,12 @@ async def process_messages(socket, q_index, q_store, q_stats):
         types, groups, sizes, data = zip(*items)
         stats['size'] = sum(sizes)
 
-        await q_store.put((v for item in data for v in item))
-        await q_index.put(create_index_entry(types[0], file_pos, groups[0]))
-        await q_stats.put(stats)
+        t1 = buff.extend(v for item in data for v in item)
+        t2 = s_index.send(m_pack(create_index_entry(types[0], file_pos, groups[0])))
+        t3 = s_stats.send(m_pack(stats))
+        await asyncio.gather(t1, t2, t3)
 
-    await q_index.put(None)
-    await q_store.put(None)
-    await q_stats.put(None)
+    buff.close()
 
 def detect_group(group):
     if len(group.dense.id):
