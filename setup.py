@@ -47,10 +47,11 @@ setup(
     },
     setup_requires = ['setuptools_git >= 1.0', 'pyrobuf'],
     install_requires=[
+        'asyncpg',
         'cytoolz >= 0.8.2',
+        'pyrobuf >= 0.9.0',
         'setproctitle',
         'sortedcontainers',
-        'pyrobuf',
     ],
     classifiers=[
         'Topic :: Software Development :: Libraries',
