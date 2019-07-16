@@ -41,6 +41,7 @@ from osmgeodb.storage import store_data
 logger = logging.getLogger(__name__)
 
 HWM = 16
+SYNC_BUFF_SIZE = 10000
 
 def get_loop():
     """
@@ -103,7 +104,7 @@ def osm_processor(dsn):
     try:
         loop.create_task(monitor_socket('processor', socket))
 
-        buff = SynchronizedBuffer(10000)
+        buff = SynchronizedBuffer(SYNC_BUFF_SIZE)
 
         t1 = process_messages(socket, buff, s_index, s_stats)
         t2 = store_data(dsn, buff)
