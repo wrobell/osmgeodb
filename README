@@ -1,2 +1,5 @@
 osmgeodb is GIS database for OpenStreetMap data using PostgreSQL relational
-database management system.
+database management system and OGC standards.
+
+The focus of the project is efficient import and querying of the
+OpenStreetMap data.
