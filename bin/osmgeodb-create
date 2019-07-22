@@ -34,6 +34,19 @@ select AddGeometryColumn('osm_point', 'location', 4326, 'POINT', 2);
 create index idx_osm_point on osm_point using gist (location);
 create index idx_osm_point_t on osm_point using gin (tags);
 
+
+create unlogged table osm_line (
+    id bigint,
+    refs bigint[],
+    tags hstore,
+    primary key (id)
+);
+
+--select AddGeometryColumn('osm_line', 'line', 4326, 'LINESTRING', 2);
+
+--create index idx_osm_point on osm_point using gist (line);
+create index idx_osm_line_t on osm_line using gin (tags);
+
 END
 
 # vim: sw=4:et:ai

@@ -22,7 +22,6 @@ import logging
 import operator
 import time
 import zmq
-import zmq.asyncio
 
 from collections import Counter
 
@@ -31,10 +30,12 @@ from .socket import recv_messages
 
 logger = logging.getLogger(__name__)
 
-FMT_STATS = 'nodes[m]: {0:,.3f} {1:.3f}/s, time[s]:' \
-    ' decompression: {2[decompression]:.1f}' \
-    ' block parse: {2[parse blocks]:.1f}' \
-    ' group parse: {2[parse groups]:.1f}'.format
+FMT_STATS = '{0}[m]: {1:,.3f} {2:.3f}/s, time[s]:' \
+    ' decompression: {3[decompression]:.1f}' \
+    ' block parse: {3[parse blocks]:.1f}' \
+    ' group parse: {3[parse groups]:.1f}'.format
+
+STATS_INTERVAL = 60
 
 async def receive_stats(socket: zmq.Socket):
     """
@@ -43,11 +44,25 @@ async def receive_stats(socket: zmq.Socket):
     :param socket: ZMQ socket.
     :param pos_index: OSM position index.
     """
-    stats: Counter = Counter()
-    show_task = asyncio.create_task(show_stats(stats))
+    stats = {
+        'dense_nodes': Counter(),
+        'ways': Counter(),
+    }
+    show_task = asyncio.create_task(asyncio.wait([
+        show_stats('nodes', stats['dense_nodes']),
+        show_stats('ways', stats['ways']),
+    ]))
 
     async for item in recv_messages(socket):
-        stats += item
+        t, st = item
+        if t not in stats:
+            continue
+
+        stats[t] += st
+
+        if 'start' not in stats[t]:
+            stats[t]['start'] = time.monotonic()
+        stats[t]['end'] = time.monotonic()
 
     show_task.cancel()
 
@@ -59,19 +74,19 @@ async def send_stats(socket: zmq.Socket, queue: asyncio.Queue):
 
         await socket.send(m_pack(item))
 
-async def show_stats(stats: Counter):
-    ts = time.monotonic()
+def print_stats(type, stats):
+    td = stats['end'] - stats['start']
+    count = stats['size'] / 1e6
+    logger.info(FMT_STATS(type, count, count / td, stats))
+
+async def show_stats(type, stats: Counter):
     try:
         while True:
-            await asyncio.sleep(60)
-
-            td = time.monotonic() - ts
-            count = stats['size'] / 1e6
-            logger.info(FMT_STATS(count, count / td, stats))
-
+            await asyncio.sleep(STATS_INTERVAL)
+            if time.monotonic() - stats.get('end', 0) > STATS_INTERVAL:
+                continue
+            print_stats(type, stats)
     finally:
-        td = time.monotonic() - ts
-        count = stats['size'] / 1e6
-        logger.info(FMT_STATS(count, count / td, stats))
+        print_stats(type, stats)
 
 # vim: sw=4:et:ai

@@ -16,7 +16,7 @@ osm_line
             Waypoint id.
         tags
             Waypoint tags stored as hstore.
-        shape
+        line
             Waypoint linestring in WGS84.
 
 osm_area

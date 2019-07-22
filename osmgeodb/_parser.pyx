@@ -1,5 +1,4 @@
-#
-# osmgeodb - GIS database for OpenStreetMap data
+# # osmgeodb - GIS database for OpenStreetMap data
 #
 # Copyright (C) 2011-2019 by Artur Wroblewski <wrobell@riseup.net>
 #
@@ -33,7 +32,10 @@ def decode_coord(pyrobuf_list.Int64List data, double granularity, double offset)
     cdef long v
     return [(v * granularity + offset) / 1e9 for v in cumsum(data)]
 
-def parse_tags(tags, pyrobuf_list.Int32List indexes, strings) -> list:
+def parse_tags_dense(tags, pyrobuf_list.Int32List indexes, strings) -> list:
+    """
+    Parse tags stored in dense nodes group of OSM data.
+    """
     cdef size_t i = 0
     cdef list result = []
     cdef size_t max_idx = indexes._n_items

@@ -36,9 +36,11 @@ import asyncpg
 
 from .ewkb import to_ewkb
 
-async def store_data(dsn, buff):
+async def store_data(dsn, buff, table, columns):
     conn = await asyncpg.connect(dsn)
     await setup_types(conn)
+
+    copy = conn.copy_records_to_table
 
     try:
         async with conn.transaction():
@@ -46,12 +48,7 @@ async def store_data(dsn, buff):
             await conn.execute('set constraints all deferred')
             while buff.is_active:
                 await buff.wait()
-
-                await conn.copy_records_to_table(
-                    'osm_point',
-                    columns=('id', 'location', 'tags'),
-                    records=buff
-                )
+                await copy(table, columns=columns, records=buff)
                 buff.clear()
     finally:
         await conn.close()

@@ -104,11 +104,15 @@ def osm_processor(dsn):
     try:
         loop.create_task(monitor_socket('processor', socket))
 
-        buff = SynchronizedBuffer(SYNC_BUFF_SIZE)
+        buffers = {
+            'dense_nodes': SynchronizedBuffer(SYNC_BUFF_SIZE),
+            'ways': SynchronizedBuffer(SYNC_BUFF_SIZE),
+        }
 
-        t1 = process_messages(socket, buff, s_index, s_stats)
-        t2 = store_data(dsn, buff)
-        loop.run_until_complete(asyncio.gather(t1, t2))
+        t1 = process_messages(socket, buffers, s_index, s_stats)
+        t2 = store_data(dsn, buffers['dense_nodes'], 'osm_point', ('id', 'location', 'tags'))
+        t3 = store_data(dsn, buffers['ways'], 'osm_line', ('id', 'refs', 'tags'))
+        loop.run_until_complete(asyncio.gather(t1, t2, t3))
 
         s_index.close()
         s_stats.close()

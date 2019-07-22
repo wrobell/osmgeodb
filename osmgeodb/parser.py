@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from ._parser import parse_tags, cumsum, decode_coord
+from ._parser import parse_tags_dense, cumsum, decode_coord
 
 # list of tags copied from osm2pgsql project default style
 TAGS = {
@@ -108,11 +108,21 @@ def parse_dense_nodes(block, data):
     lons = decode_coord(data.lon, granularity, lon_offset)
     lats = decode_coord(data.lat, granularity, lat_offset)
 
-    tags = parse_tags(TAGS, data.keys_vals, block.stringtable.s)
+    tags = parse_tags_dense(TAGS, data.keys_vals, block.stringtable.s)
 
     items = zip(ids, lons, lats, tags)
 
-    # store those positions, which have tags
+    # store these positions, which have tags
     return [(id, (lon, lat), meta) for id, lon, lat, meta in items if meta]
+
+def parse_ways(block, data):
+    strings = [s.decode('utf-8') for s in block.stringtable.s]
+    items = ((w.id, cumsum(w.refs), parse_tags(strings, w)) for w in data)
+    # store these lines, which have tags
+    return [(id, points, meta) for id, points, meta in items if meta]
+
+def parse_tags(strings, data):
+    items = ((strings[k], strings[v]) for k, v in zip(data.keys, data.vals))
+    return {k: v for k, v in items if k in TAGS}
 
 # vim: sw=4:et:ai

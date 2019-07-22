@@ -23,14 +23,14 @@ import time
 import zlib
 
 from .osm_proto import PrimitiveBlock
-from .parser import parse_dense_nodes
+from .parser import parse_dense_nodes, parse_ways
 from .posindex import create_index_entry
 from .socket import recv_messages
 from .mpack import m_pack
 
 logger = logging.getLogger(__name__)
 
-async def process_messages(socket, buff, s_index, s_stats):
+async def process_messages(socket, buffers, s_index, s_stats):
     async for file_pos, data in recv_messages(socket):
         stats = {}
         ts = time.monotonic()
@@ -51,16 +51,19 @@ async def process_messages(socket, buff, s_index, s_stats):
         types, groups, sizes, data = zip(*items)
         stats['size'] = sum(sizes)
 
-        t1 = buff.extend(v for item in data for v in item)
-        t2 = s_index.send(m_pack(create_index_entry(types[0], file_pos, groups[0])))
-        t3 = s_stats.send(m_pack(stats))
-        await asyncio.gather(t1, t2, t3)
+        t1 = buffers[types[0]].extend(v for item in data for v in item)
+        #t2 = s_index.send(m_pack(create_index_entry(types[0], file_pos, groups[0])))
+        t3 = s_stats.send(m_pack((types[0], stats)))
+        await asyncio.gather(t1, t3)
 
-    buff.close()
+    for buff in buffers.values():
+        buff.close()
 
 def detect_group(group):
     if len(group.dense.id):
         result = 'dense_nodes', group.dense, len(group.dense.id), parse_dense_nodes
+    elif len(group.ways):
+        result = 'ways', group.ways, len(group.ways), parse_ways
     else:
         result = None
 
