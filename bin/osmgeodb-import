@@ -110,9 +110,8 @@ def osm_processor(dsn):
         }
 
         t1 = process_messages(socket, buffers, s_index, s_stats)
-        t2 = store_data(dsn, buffers['dense_nodes'], 'osm_point', ('id', 'location', 'tags'))
-        t3 = store_data(dsn, buffers['ways'], 'osm_line', ('id', 'refs', 'tags'))
-        loop.run_until_complete(asyncio.gather(t1, t2, t3))
+        t2 = store_data(dsn, buffers)
+        loop.run_until_complete(asyncio.gather(t1, t2))
 
         s_index.close()
         s_stats.close()

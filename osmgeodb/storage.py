@@ -32,26 +32,39 @@ Based on
     https://www.postgresql.org/docs/current/populate.html
 """
 
+import asyncio
 import asyncpg
 
 from .ewkb import to_ewkb
 
-async def store_data(dsn, buff, table, columns):
+async def store_data(dsn, buffers):
     conn = await asyncpg.connect(dsn)
     await setup_types(conn)
-
-    copy = conn.copy_records_to_table
 
     try:
         async with conn.transaction():
             await conn.execute('set local synchronous_commit to off')
             await conn.execute('set constraints all deferred')
-            while buff.is_active:
-                await buff.wait()
-                await copy(table, columns=columns, records=buff)
-                buff.clear()
+
+            lock = asyncio.Lock()
+            t1 = copy_data(conn, lock, buffers['dense_nodes'], 'osm_point', ('id', 'location', 'tags'))
+            t2 = copy_data(conn, lock, buffers['ways'], 'osm_line', ('id', 'refs', 'tags'))
+
+            await asyncio.gather(t1, t2)
+
     finally:
         await conn.close()
+
+async def copy_data(conn, lock, buff, table, columns):
+    copy = conn.copy_records_to_table
+    while buff.is_active:
+        await buff.wait()
+
+        # data insert is performed using single connection and we need to
+        # serialize inserts of points, lines and areas
+        async with lock:
+            await copy(table, columns=columns, records=buff)
+        buff.clear()
 
 async def setup_types(conn):
     # hstore type support
