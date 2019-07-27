@@ -21,6 +21,7 @@ import asyncio
 import logging
 import operator
 import time
+import typing as tp
 import zmq
 
 from collections import Counter
@@ -29,6 +30,8 @@ from .mpack import m_pack
 from .socket import recv_messages
 
 logger = logging.getLogger(__name__)
+
+Stats = tp.Dict[str, Counter]
 
 FMT_STATS = '{0}[m]: {1:,.3f} {2:.3f}/s, time[s]:' \
     ' decompression: {3[decompression]:.1f}' \
@@ -44,7 +47,7 @@ async def receive_stats(socket: zmq.Socket):
     :param socket: ZMQ socket.
     :param pos_index: OSM position index.
     """
-    stats = {
+    stats: Stats = {
         'dense_nodes': Counter(),
         'ways': Counter(),
     }
@@ -61,8 +64,8 @@ async def receive_stats(socket: zmq.Socket):
         stats[t] += st
 
         if 'start' not in stats[t]:
-            stats[t]['start'] = time.monotonic()
-        stats[t]['end'] = time.monotonic()
+            stats[t]['start'] = time.monotonic()  # type: ignore
+        stats[t]['end'] = time.monotonic()  # type: ignore
 
     show_task.cancel()
 
