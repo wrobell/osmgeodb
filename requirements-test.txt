@@ -3,4 +3,5 @@
 asynctest
 mypy
 pytest-cov>=2.6.0
+pytest-asyncio
 pytest-timeout
